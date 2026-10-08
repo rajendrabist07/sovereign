@@ -7,7 +7,17 @@ module.exports = [
     ...tseslint.configs.recommended,
     eslintConfigPrettier,
     {
-        ignores: ["**/dist/**", "**/.next/**", "**/.turbo/**", "**/node_modules/**"]
+        ignores: [
+            "**/dist/**",
+            "**/.next/**",
+            "**/.turbo/**",
+            "**/node_modules/**",
+            "**/eslint.config.js",
+            "**/eslint.config.mjs",
+            "**/next.config.*",
+            "**/postcss.config.*",
+            "**/tailwind.config.*"
+        ]
     },
     {
         rules: {

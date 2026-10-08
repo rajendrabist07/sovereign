@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("free")
+  createdAt DateTime @default(now())
+
+  memberships Membership[]
+  workflows   Workflow[]
+  auditLogs   AuditLog[]
+  apiKeys     ApiKey[]
+  quotas      Quota[]
+  runSteps  RunStep[]
+  approvals Approval[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String   @unique
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  memberships Membership[]
+
+  @@map("users")
+}
+
+model Membership {
+  userId   String
+  tenantId String
+  role     Role
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([userId, tenantId])
+  @@index([tenantId])
+  @@map("memberships")
+}
+
+model Workflow {
+  id         String         @id @default(uuid())
+  tenantId   String
+  name       String
+  definition Json
+  status     WorkflowStatus @default(DRAFT)
+  createdBy  String
+  createdAt  DateTime       @default(now())
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs   WorkflowRun[]
+
+  @@index([tenantId])
+  @@map("workflows")
+}
+
+model WorkflowRun {
+  id             String    @id @default(uuid())
+  workflowId     String
+  tenantId       String
+  status         RunStatus @default(PENDING)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  triggerPayload Json?
+
+  workflow Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  steps    RunStep[]
+
+  @@index([tenantId])
+  @@index([workflowId])
+  @@map("workflow_runs")
+}
+
+model RunStep {
+  id         String    @id @default(uuid())
+  tenantId   String
+  runId      String
+  stepIndex  Int
+  type       String
+  input      Json?
+  output     Json?
+  status     RunStatus @default(PENDING)
+  error      String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run       WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  approvals Approval[]
+
+  @@index([tenantId])
+  @@index([runId])
+  @@map("run_steps")
+}
+
+model Approval {
+  id          String    @id @default(uuid())
+  tenantId    String
+  runId       String
+  stepId      String
+  requestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+  decidedBy   String?
+  decision    String?
+  note        String?
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  step   RunStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([stepId])
+  @@map("approvals")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  tenantId     String
+  actorUserId  String
+  action       String
+  resourceType String
+  resourceId   String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("audit_log")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  tenantId   String
+  hashedKey  String    @unique
+  name       String
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("api_keys")
+}
+
+model Quota {
+  tenantId   String
+  month      String
+  runsUsed   Int      @default(0)
+  tokensUsed Int      @default(0)
+  resetAt    DateTime
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, month])
+  @@map("quotas")
+}

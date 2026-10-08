@@ -2,4 +2,6 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
-  unrs-resolver: false
+  '@prisma/engines': true
+  prisma: true
+  unrs-resolver: true
