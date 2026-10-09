@@ -7,11 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify-rbac": "tsx --env-file=.env.local scripts/verify-rbac.mts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.11",
     "@sovereign/db": "workspace:*",
+    "@sovereign/shared": "workspace:*",
+    "@trpc/server": "^11.19.0",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -25,6 +28,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
   "packageManager": "pnpm@11.15.1"
