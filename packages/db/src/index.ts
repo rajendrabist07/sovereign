@@ -46,3 +46,6 @@ export async function withTenant<T>(
     return fn(tx);
   }, TRANSACTION_OPTIONS);
 }
+
+/** The transaction client handed to code running inside withTenant(). */
+export type TenantTx = Prisma.TransactionClient;

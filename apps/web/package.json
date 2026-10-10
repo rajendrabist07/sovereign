@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "verify-rbac": "tsx --env-file=.env.local scripts/verify-rbac.mts"
+    "verify-rbac": "tsx --env-file=.env.local scripts/verify-rbac.mts",
+    "verify-audit": "tsx --env-file=.env.local scripts/verify-audit.mts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.11",
