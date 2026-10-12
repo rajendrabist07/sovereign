@@ -44,3 +44,26 @@ export const workflowInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   definition: workflowDefinitionSchema
 });
+
+export type WorkflowStep = z.infer<typeof stepSchema>;
+
+export const RUN_STATUSES = ["PENDING", "RUNNING", "COMPLETED", "FAILED"] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];
+
+/**
+ * A run's status is DERIVED from its steps, never set by hand:
+ * run_steps is the source of truth.
+ */
+export function deriveRunStatus(stepStatuses: readonly RunStatus[]): RunStatus {
+  if (stepStatuses.some((s) => s === "FAILED")) return "FAILED";
+  if (stepStatuses.length > 0 && stepStatuses.every((s) => s === "COMPLETED")) return "COMPLETED";
+  if (stepStatuses.some((s) => s === "RUNNING" || s === "COMPLETED")) return "RUNNING";
+  return "PENDING";
+}
+
+// Events carry IDs only, never payloads: event bodies are stored and
+// logged by the queue, and the runner re-reads state under tenant RLS.
+export const runRequestedEventSchema = z.object({
+  runId: z.string().uuid(),
+  tenantId: z.string().min(1)
+});

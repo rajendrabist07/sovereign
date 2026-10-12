@@ -9,13 +9,15 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "verify-rbac": "tsx --env-file=.env.local scripts/verify-rbac.mts",
-    "verify-audit": "tsx --env-file=.env.local scripts/verify-audit.mts"
+    "verify-audit": "tsx --env-file=.env.local scripts/verify-audit.mts",
+    "verify-runner": "tsx --env-file=.env.local scripts/verify-runner.mts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.11",
     "@sovereign/db": "workspace:*",
     "@sovereign/shared": "workspace:*",
     "@trpc/server": "^11.19.0",
+    "inngest": "^4.22.0",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8"

@@ -5,7 +5,8 @@ import type { Session } from "./init";
 export type AuditAction =
   | "workflow.created"
   | "workflow.updated"
-  | "workflow.deleted";
+  | "workflow.deleted"
+  | "run.requested";
 
 /**
  * Must be called with the SAME tx the mutation used (ctx.db), so the
@@ -17,7 +18,7 @@ export async function writeAudit(
   session: Session,
   entry: {
     action: AuditAction;
-    resourceType: "workflow";
+    resourceType: "workflow" | "run";
     resourceId: string;
     metadata?: Record<string, string | number | boolean>;
   }

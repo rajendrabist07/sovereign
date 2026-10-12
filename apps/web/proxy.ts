@@ -4,7 +4,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher([
     "/",
     "/sign-in(.*)",
-    "/sign-up(.*)"
+    "/sign-up(.*)",
+  // Inngest calls this endpoint; it authenticates by request signature, not a Clerk session.
+  "/api/inngest(.*)"
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
