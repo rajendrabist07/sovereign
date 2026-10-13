@@ -93,12 +93,14 @@ model WorkflowRun {
   startedAt      DateTime?
   finishedAt     DateTime?
   triggerPayload Json?
+  createdAt      DateTime  @default(now())
 
   workflow Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   steps    RunStep[]
 
   @@index([tenantId])
   @@index([workflowId])
+  @@index([tenantId, createdAt])
   @@map("workflow_runs")
 }
 

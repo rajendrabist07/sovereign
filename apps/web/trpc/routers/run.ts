@@ -96,6 +96,37 @@ export const runRouter = router({
       return run;
     }),
 
+  list: viewerProcedure
+    .input(
+      z
+        .object({
+          workflowId: z.string().uuid().optional(),
+          cursor: z.string().uuid().optional(),
+          limit: z.number().int().min(1).max(100).default(25)
+        })
+        .default({})
+    )
+    .query(async ({ ctx, input }) => {
+      // Fetch one extra row to learn whether another page exists.
+      const rows = await ctx.db.workflowRun.findMany({
+        where: input.workflowId ? { workflowId: input.workflowId } : undefined,
+        // id breaks ties so paging stays stable for identical timestamps.
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+        include: {
+          workflow: { select: { name: true } },
+          _count: { select: { steps: true } }
+        }
+      });
+      const hasMore = rows.length > input.limit;
+      const items = hasMore ? rows.slice(0, input.limit) : rows;
+      return {
+        items,
+        nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null
+      };
+    }),
+
   get: viewerProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
