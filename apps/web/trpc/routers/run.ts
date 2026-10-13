@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { withTenant } from "@sovereign/db";
-import { workflowDefinitionSchema, z } from "@sovereign/shared";
+import { getPlanLimits, workflowDefinitionSchema, z } from "@sovereign/shared";
 import { inngest } from "../../inngest/client";
+import { refundRun, reserveRun } from "../../lib/quota/runs";
 import { recordStep } from "../../lib/runs/state";
 import { writeAudit } from "../audit";
 import { memberProcedure, router, viewerProcedure } from "../init";
@@ -28,6 +29,25 @@ export const runRouter = router({
 
       const definition = workflowDefinitionSchema.parse(workflow.definition);
       const tenantId = ctx.session.tenantId;
+
+      // Reserve as late as possible: the reservation holds a row lock until
+      // this transaction commits, and validation failures above must not
+      // consume quota.
+      const tenant = await ctx.db.tenant.findUniqueOrThrow({
+        where: { id: tenantId },
+        select: { plan: true }
+      });
+      const quota = await reserveRun(
+        ctx.db,
+        tenantId,
+        getPlanLimits(tenant.plan).runsPerMonth
+      );
+      if (!quota.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: `Monthly run limit reached (${quota.limit}). Resets on ${quota.resetAt.toISOString().slice(0, 10)}.`
+        });
+      }
 
       const run = await ctx.db.workflowRun.create({
         data: { workflowId: workflow.id, tenantId, triggerPayload: input.payload }
@@ -57,13 +77,14 @@ export const runRouter = router({
           });
         } catch (cause) {
           // The run row is committed but will never start: record that
-          // instead of leaving it PENDING forever.
-          await withTenant(tenantId, (tx) =>
-            recordStep(tx, run.id, 0, {
+          // instead of leaving it PENDING forever, and give the quota back.
+          await withTenant(tenantId, async (tx) => {
+            await recordStep(tx, run.id, 0, {
               status: "FAILED",
               error: "Could not enqueue the run"
-            })
-          );
+            });
+            await refundRun(tx, tenantId);
+          });
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Could not enqueue the run",

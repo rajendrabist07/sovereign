@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "verify-rbac": "tsx --env-file=.env.local scripts/verify-rbac.mts",
     "verify-audit": "tsx --env-file=.env.local scripts/verify-audit.mts",
-    "verify-runner": "tsx --env-file=.env.local scripts/verify-runner.mts"
+    "verify-runner": "tsx --env-file=.env.local scripts/verify-runner.mts",
+    "verify-quota": "tsx --env-file=.env.local scripts/verify-quota.mts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.11",

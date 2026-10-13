@@ -67,3 +67,29 @@ export const runRequestedEventSchema = z.object({
   runId: z.string().uuid(),
   tenantId: z.string().min(1)
 });
+
+// Monthly run limits per plan. Unknown plans fall back to the most
+// restrictive one (free), never to an unlimited default.
+export const PLAN_LIMITS = {
+  free: { runsPerMonth: 100 },
+  pro: { runsPerMonth: 5000 }
+} as const;
+
+export type PlanName = keyof typeof PLAN_LIMITS;
+
+export function getPlanLimits(plan: string) {
+  return Object.hasOwn(PLAN_LIMITS, plan)
+    ? PLAN_LIMITS[plan as PlanName]
+    : PLAN_LIMITS.free;
+}
+
+/** The quota row key for a moment in time: calendar month in UTC. */
+export function quotaPeriod(now: Date): { month: string; resetAt: Date } {
+  const year = now.getUTCFullYear();
+  const monthIndex = now.getUTCMonth();
+  return {
+    month: `${year}-${String(monthIndex + 1).padStart(2, "0")}`,
+    // Date.UTC rolls month 12 over into January of the next year.
+    resetAt: new Date(Date.UTC(year, monthIndex + 1, 1))
+  };
+}
