@@ -5,7 +5,10 @@ const adapter = new PrismaPg({
   connectionString: process.env.RUNTIME_DATABASE_URL,
   // Supabase requires TLS. rejectUnauthorized:false skips CA verification,
   // acceptable for local dev; revisit before production deploy.
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  // Keep connections open between requests: a new one costs ~1.2 s
+  // (TCP + TLS + auth at ~150 ms per round trip, Nepal to Seoul).
+  idleTimeoutMillis: 300_000
 });
 
 // Reuse one client across hot-reloads in dev — Next.js reloads modules

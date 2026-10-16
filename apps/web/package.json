@@ -12,17 +12,27 @@
     "verify-audit": "tsx --env-file=.env.local scripts/verify-audit.mts",
     "verify-runner": "tsx --env-file=.env.local scripts/verify-runner.mts",
     "verify-quota": "tsx --env-file=.env.local scripts/verify-quota.mts",
-    "verify-run-list": "tsx --env-file=.env.local scripts/verify-run-list.mts"
+    "verify-run-list": "tsx --env-file=.env.local scripts/verify-run-list.mts",
+    "seed": "tsx --env-file=.env.local scripts/seed.mts",
+    "measure-latency": "tsx --env-file=.env.local scripts/measure-latency.mts",
+    "verify-sync-cache": "tsx --env-file=.env.local scripts/verify-sync-cache.mts",
+    "verify": "pnpm run verify-sync-cache && pnpm run verify-rbac && pnpm run verify-audit && pnpm run verify-quota && pnpm run verify-runner && pnpm run verify-run-list"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.11",
     "@sovereign/db": "workspace:*",
     "@sovereign/shared": "workspace:*",
+    "@tanstack/react-query": "^5.104.2",
+    "@trpc/client": "^11.19.0",
     "@trpc/server": "^11.19.0",
+    "@trpc/tanstack-react-query": "^11.19.0",
+    "clsx": "^2.1.1",
     "inngest": "^4.22.0",
     "next": "16.3.5",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "superjson": "^2.2.6",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@sovereign/config": "workspace:*",

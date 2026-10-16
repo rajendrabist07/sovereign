@@ -1,4 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import superjson from "superjson";
 import { withTenant } from "@sovereign/db";
 import { roleAtLeast, type Role } from "@sovereign/shared";
 
@@ -12,7 +13,7 @@ export type Context = {
 
 type AfterCommit = (fn: () => Promise<void>) => void;
 
-const t = initTRPC.context<Context>().create();
+const t = initTRPC.context<Context>().create({ transformer: superjson });
 
 export const router = t.router;
 export const createCallerFactory = t.createCallerFactory;

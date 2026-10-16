@@ -10,12 +10,5 @@ export async function createTRPCContext(): Promise<Context> {
   if (result.needsOrganization) {
     return { session: null, reason: "NO_ORGANIZATION" };
   }
-
-  return {
-    session: {
-      userId: result.user.id,
-      tenantId: result.tenant.id,
-      role: result.role
-    }
-  };
+  return { session: result.session };
 }

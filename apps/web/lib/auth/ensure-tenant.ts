@@ -1,23 +1,45 @@
 import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
-import { prisma, withTenant } from "@sovereign/db";
+import { prisma, withTenant, type TenantTx } from "@sovereign/db";
+import type { Role } from "@sovereign/shared";
+import { createSyncCache, syncKey } from "./sync-cache";
+
+export type ResolvedSession = { userId: string; tenantId: string; role: Role };
+
+export type Resolution =
+  | { needsOrganization: true }
+  | { needsOrganization: false; session: ResolvedSession };
+
+// Per process and best effort: a cold serverless instance just syncs again.
+const synced = createSyncCache<ResolvedSession>({
+  ttlMs: 5 * 60_000,
+  maxEntries: 500
+});
+
+function upsertMembership(tx: TenantTx, userId: string, tenantId: string, role: Role) {
+  return tx.membership.upsert({
+    where: { userId_tenantId: { userId, tenantId } },
+    update: { role },
+    create: { userId, tenantId, role }
+  });
+}
 
 /**
- * Call at the top of any protected page/route. Mirrors the signed-in
- * Clerk user, their active Clerk Organization, and their role into our
- * own users / tenants / memberships tables (first time only).
- *
- * Clerk's org_id IS our tenant_id, so we never have to "discover" the
- * tenant from a tenant-scoped table (the RLS chicken-and-egg problem).
+ * Mirrors the signed-in Clerk user, their active Clerk Organization and
+ * their role into our users / tenants / memberships tables. Clerk's org_id
+ * IS our tenant_id, so we never have to "discover" the tenant from a
+ * tenant-scoped table (the RLS chicken-and-egg problem).
  */
-export async function ensureUserAndTenant() {
+export async function ensureUserAndTenant(): Promise<Resolution> {
   const { userId, orgId, orgRole } = await auth();
 
   if (!userId) {
     throw new Error("ensureUserAndTenant called without a signed-in user");
   }
-  if (!orgId) {
-    return { needsOrganization: true as const };
-  }
+  if (!orgId) return { needsOrganization: true };
+
+  const key = syncKey(userId, orgId, orgRole);
+  const hit = synced.get(key);
+  if (hit) return { needsOrganization: false, session: hit };
 
   const clerkUser = await currentUser();
   const email =
@@ -30,43 +52,38 @@ export async function ensureUserAndTenant() {
     create: { clerkId: userId, email }
   });
 
-  const role = orgRole === "org:admin" ? "ADMIN" : "MEMBER";
+  const role: Role = orgRole === "org:admin" ? "ADMIN" : "MEMBER";
 
-  let tenant = await withTenant(orgId, (tx) =>
-    tx.tenant.findUnique({ where: { id: orgId } })
-  );
+  // One transaction when the tenant already exists (the common case).
+  const mirrored = await withTenant(orgId, async (tx) => {
+    const tenant = await tx.tenant.findUnique({
+      where: { id: orgId },
+      select: { id: true }
+    });
+    if (!tenant) return false;
+    await upsertMembership(tx, user.id, orgId, role);
+    return true;
+  });
 
-  if (!tenant) {
-    // Network call to Clerk happens OUTSIDE any DB transaction, so we
-    // never hold a transaction open while waiting on another service.
+  if (!mirrored) {
+    // The network call to Clerk happens OUTSIDE any DB transaction.
     const client = await clerkClient();
     const org = await client.organizations.getOrganization({
       organizationId: orgId
     });
-
-    // upsert (not create): two simultaneous first requests must not
-    // crash on the unique constraint.
-    tenant = await withTenant(orgId, (tx) =>
-      tx.tenant.upsert({
+    // upsert (not create): two simultaneous first requests must not crash
+    // on the unique constraint.
+    await withTenant(orgId, async (tx) => {
+      await tx.tenant.upsert({
         where: { id: orgId },
         update: {},
         create: { id: orgId, name: org.name, slug: org.slug ?? orgId }
-      })
-    );
+      });
+      await upsertMembership(tx, user.id, orgId, role);
+    });
   }
 
-  const membership = await withTenant(orgId, (tx) =>
-    tx.membership.upsert({
-      where: { userId_tenantId: { userId: user.id, tenantId: orgId } },
-      update: { role },
-      create: { userId: user.id, tenantId: orgId, role }
-    })
-  );
-
-  return {
-    needsOrganization: false as const,
-    user,
-    tenant,
-    role: membership.role
-  };
+  const session = { userId: user.id, tenantId: orgId, role };
+  synced.set(key, session);
+  return { needsOrganization: false, session };
 }
