@@ -9,7 +9,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
-    "dev:inngest": "cd \"$(mktemp -d)\" && npx --ignore-scripts=false inngest-cli@latest dev -u http://localhost:3000/api/inngest"
+    "dev:inngest": "pnpm --filter web run dev:inngest",
+    "dev:all": "turbo run dev dev:inngest"
   },
   "keywords": [],
   "author": "Rajendra Bist",

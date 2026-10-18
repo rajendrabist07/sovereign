@@ -101,7 +101,7 @@ export const runRouter = router({
       z
         .object({
           workflowId: z.string().uuid().optional(),
-          cursor: z.string().uuid().optional(),
+          cursor: z.string().uuid().nullish(),
           limit: z.number().int().min(1).max(100).default(25)
         })
         .default({})
@@ -132,7 +132,10 @@ export const runRouter = router({
     .query(async ({ ctx, input }) => {
       const run = await ctx.db.workflowRun.findUnique({
         where: { id: input.id },
-        include: { steps: { orderBy: { stepIndex: "asc" } } }
+        include: {
+          workflow: { select: { name: true, status: true } },
+          steps: { orderBy: { stepIndex: "asc" } }
+        }
       });
       if (!run) throw new TRPCError({ code: "NOT_FOUND" });
       return run;
