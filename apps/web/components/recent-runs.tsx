@@ -3,9 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { ListEmpty, ListError, ListSkeleton } from "@/components/list-states";
 import { RunRows } from "@/components/run-rows";
+import { pollDelay, youngestActiveAge } from "@/lib/polling";
 import { useTRPC } from "@/trpc/client";
-
-const ACTIVE = new Set(["PENDING", "RUNNING"]);
 
 export function RecentRuns() {
   const trpc = useTRPC();
@@ -13,7 +12,7 @@ export function RecentRuns() {
     ...trpc.run.list.queryOptions({ limit: 8 }),
     // Poll only while something is in flight: every poll costs a DB transaction.
     refetchInterval: (query) =>
-      query.state.data?.items.some((run) => ACTIVE.has(run.status)) ? 2000 : false
+      pollDelay(query.state.data ? youngestActiveAge(query.state.data.items) : null)
   });
 
   if (runs.isPending) return <ListSkeleton />;

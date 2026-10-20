@@ -4,9 +4,9 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { Button } from "@/components/button";
 import { ListEmpty, ListError, ListSkeleton } from "@/components/list-states";
 import { RunRows } from "@/components/run-rows";
+import { pollDelay, youngestActiveAge } from "@/lib/polling";
 import { useTRPC } from "@/trpc/client";
 
-const ACTIVE = new Set(["PENDING", "RUNNING"]);
 const PAGE_SIZE = 10;
 
 export function RunHistory() {
@@ -18,11 +18,11 @@ export function RunHistory() {
     ),
     // Polling refetches every loaded page, so keep it to "something is in flight".
     refetchInterval: (query) =>
-      query.state.data?.pages.some((page) =>
-        page.items.some((run) => ACTIVE.has(run.status))
+      pollDelay(
+        query.state.data
+          ? youngestActiveAge(query.state.data.pages.flatMap((page) => page.items))
+          : null
       )
-        ? 2000
-        : false
   });
 
   if (runs.isPending) return <ListSkeleton />;

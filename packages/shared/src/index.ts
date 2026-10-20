@@ -19,7 +19,7 @@ export const stepSchema = z.discriminatedUnion("type", [
     type: z.literal("HTTP_REQUEST"),
     name: stepName,
     method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
-    url: z.string().url().max(2000),
+    url: z.string().url().max(2000).startsWith("https://", "Only https:// URLs are allowed"),
     body: z.string().max(10_000).optional()
   }),
   z.object({

@@ -9,12 +9,12 @@ import { StatusDot } from "@/components/status-dot";
 import { formatDuration, formatRelative } from "@/lib/format";
 import { STEP_LABEL } from "@/lib/step-labels";
 import { cn } from "@/lib/utils";
+import { pollDelay, youngestActiveAge } from "@/lib/polling";
 import { useTRPC } from "@/trpc/client";
 import type { RouterOutputs } from "@/trpc/types";
 
 type Step = RouterOutputs["run"]["get"]["steps"][number];
 
-const ACTIVE = new Set(["PENDING", "RUNNING"]);
 const NOT_FOUND_CODES = ["NOT_FOUND", "BAD_REQUEST"];
 
 const httpOutput = z.object({
@@ -116,7 +116,7 @@ export function RunTimeline({ runId }: { runId: string }) {
   const query = useQuery({
     ...trpc.run.get.queryOptions({ id: runId }),
     refetchInterval: (q) =>
-      q.state.data && ACTIVE.has(q.state.data.status) ? 1500 : false,
+      pollDelay(q.state.data ? youngestActiveAge([q.state.data]) : null),
     retry: (count, error) =>
       !NOT_FOUND_CODES.includes(error.data?.code ?? "") && count < 1
   });

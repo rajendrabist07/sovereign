@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { workflowDefinitionSchema } from "@sovereign/shared";
+import { roleAtLeast, workflowDefinitionSchema } from "@sovereign/shared";
 import { ListEmpty, ListError, ListSkeleton } from "@/components/list-states";
 import { RunAction } from "@/components/run-action";
 import { formatRelative } from "@/lib/format";
@@ -22,6 +23,8 @@ function summarize(definition: unknown): string {
 export function WorkflowList() {
   const trpc = useTRPC();
   const workflows = useQuery(trpc.workflow.list.queryOptions());
+  const me = useQuery(trpc.me.queryOptions());
+  const canEdit = me.data ? roleAtLeast(me.data.role, "ADMIN") : false;
 
   if (workflows.isPending) return <ListSkeleton />;
   if (workflows.isError) {
@@ -35,7 +38,10 @@ export function WorkflowList() {
   }
   if (workflows.data.length === 0) {
     return (
-      <ListEmpty title="No workflows yet" hint="Workflows you create show up here." />
+      <ListEmpty
+        title="No workflows yet"
+        hint={canEdit ? "Create your first workflow to start running automations." : "Workflows your admins create show up here."}
+      />
     );
   }
 
@@ -53,6 +59,15 @@ export function WorkflowList() {
           >
             {formatRelative(workflow.createdAt)}
           </time>
+          {canEdit && (
+            <Link
+              href={`/workflows/${workflow.id}/edit`}
+              aria-label={`Edit ${workflow.name}`}
+              className="text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+            >
+              Edit
+            </Link>
+          )}
           <RunAction
             workflowId={workflow.id}
             archived={workflow.status === "ARCHIVED"}
