@@ -10,7 +10,8 @@
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
     "dev:inngest": "pnpm --filter web run dev:inngest",
-    "dev:all": "turbo run dev dev:inngest"
+    "dev:all": "turbo run dev dev:inngest",
+    "verify-stack": "node scripts/verify-stack.mjs"
   },
   "keywords": [],
   "author": "Rajendra Bist",
