@@ -1,5 +1,6 @@
 import { formatDuration, formatRelative } from "../lib/format";
 import { pollDelay, youngestActiveAge } from "../lib/polling";
+import { stepDisplayStatus } from "../lib/step-status";
 import {
   draftToInput,
   moveStep,
@@ -12,6 +13,28 @@ import {
 import { createChecker } from "./lib";
 
 const { check, finish } = createChecker();
+
+// step display status
+check(
+  "a PENDING step in a FAILED run shows as SKIPPED",
+  stepDisplayStatus("FAILED", "PENDING") === "SKIPPED"
+);
+check(
+  "a COMPLETED step in a FAILED run stays COMPLETED",
+  stepDisplayStatus("FAILED", "COMPLETED") === "COMPLETED"
+);
+check(
+  "the FAILED step itself stays FAILED",
+  stepDisplayStatus("FAILED", "FAILED") === "FAILED"
+);
+check(
+  "a PENDING step in a RUNNING run is still queued",
+  stepDisplayStatus("RUNNING", "PENDING") === "PENDING"
+);
+check(
+  "a PENDING step in a PENDING run is still queued",
+  stepDisplayStatus("PENDING", "PENDING") === "PENDING"
+);
 
 // formatting
 check("duration: 0 ms", formatDuration(0) === "0 ms");

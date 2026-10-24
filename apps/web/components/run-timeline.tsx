@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { stepSchema, z, type WorkflowStep } from "@sovereign/shared";
 import { ListError, ListSkeleton } from "@/components/list-states";
 import { RunAction } from "@/components/run-action";
-import { StatusDot } from "@/components/status-dot";
+import { StatusDot, type StatusDotValue } from "@/components/status-dot";
+import { stepDisplayStatus } from "@/lib/step-status";
 import { formatDuration, formatRelative } from "@/lib/format";
 import { STEP_LABEL } from "@/lib/step-labels";
 import { cn } from "@/lib/utils";
@@ -19,15 +20,16 @@ const NOT_FOUND_CODES = ["NOT_FOUND", "BAD_REQUEST"];
 
 const httpOutput = z.object({
   status: z.number(),
-  bodyPreview: z.string().optional()
+  bodyPreview: z.string().optional(),
 });
 const waitOutput = z.object({ waitedSeconds: z.number() });
 
-const NODE: Record<Step["status"], string> = {
+const NODE: Record<StatusDotValue, string> = {
   PENDING: "border-line bg-paper",
   RUNNING: "border-running bg-surface motion-safe:animate-pulse",
   COMPLETED: "border-done bg-done",
-  FAILED: "border-failed bg-failed"
+  FAILED: "border-failed bg-failed",
+  SKIPPED: "border-line bg-paper",
 };
 
 function describe(definition: WorkflowStep): string {
@@ -41,7 +43,10 @@ function describe(definition: WorkflowStep): string {
   }
 }
 
-function outcomeOf(step: Step): { text: string | null; preview: string | null } {
+function outcomeOf(step: Step): {
+  text: string | null;
+  preview: string | null;
+} {
   const took =
     step.startedAt && step.finishedAt
       ? formatDuration(step.finishedAt.getTime() - step.startedAt.getTime())
@@ -56,20 +61,34 @@ function outcomeOf(step: Step): { text: string | null; preview: string | null } 
   if (http.success) {
     return {
       text: `HTTP ${http.data.status}${took ? `, ${took}` : ""}`,
-      preview: http.data.bodyPreview ?? null
+      preview: http.data.bodyPreview ?? null,
     };
   }
   const wait = waitOutput.safeParse(step.output);
-  if (wait.success) return { text: `Waited ${wait.data.waitedSeconds} s`, preview: null };
+  if (wait.success)
+    return { text: `Waited ${wait.data.waitedSeconds} s`, preview: null };
   return { text: took, preview: null };
 }
 
-function TimelineStep({ step, isLast }: { step: Step; isLast: boolean }) {
+function TimelineStep({
+  step,
+  isLast,
+  runStatus,
+}: {
+  step: Step;
+  isLast: boolean;
+  runStatus: string;
+}) {
   const definition = stepSchema.safeParse(step.input);
-  const title = definition.success ? definition.data.name : `Step ${step.stepIndex + 1}`;
-  const kind = definition.success ? STEP_LABEL[definition.data.type] : step.type;
+  const title = definition.success
+    ? definition.data.name
+    : `Step ${step.stepIndex + 1}`;
+  const kind = definition.success
+    ? STEP_LABEL[definition.data.type]
+    : step.type;
   const detail = definition.success ? describe(definition.data) : null;
   const outcome = outcomeOf(step);
+  const status = stepDisplayStatus(runStatus, step.status);
 
   return (
     <li className="relative pb-8 pl-9 last:pb-0">
@@ -78,24 +97,33 @@ function TimelineStep({ step, isLast }: { step: Step; isLast: boolean }) {
           aria-hidden
           className={cn(
             "absolute left-[7.5px] top-[1.375rem] -bottom-1.5 w-px",
-            step.status === "COMPLETED" ? "bg-done" : "bg-line"
+            status === "COMPLETED" ? "bg-done" : "bg-line",
           )}
         />
       )}
       <span
         aria-hidden
-        className={cn("absolute left-0 top-1.5 size-4 rounded-full border-2", NODE[step.status])}
+        className={cn(
+          "absolute left-0 top-1.5 size-4 rounded-full border-2",
+          NODE[status],
+        )}
       />
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
         <p className="font-medium">
           {title} <span className="font-normal text-muted">{kind}</span>
         </p>
-        <StatusDot status={step.status} />
+        <StatusDot status={status} />
       </div>
-      {detail && <p className="mt-0.5 break-all text-sm text-muted">{detail}</p>}
-      {outcome.text && <p className="mt-1 text-sm tabular-nums">{outcome.text}</p>}
+      {detail && (
+        <p className="mt-0.5 break-all text-sm text-muted">{detail}</p>
+      )}
+      {outcome.text && (
+        <p className="mt-1 text-sm tabular-nums">{outcome.text}</p>
+      )}
       {step.error && (
-        <p className="mt-1 border-l-2 border-failed pl-3 text-sm">{step.error}</p>
+        <p className="mt-1 border-l-2 border-failed pl-3 text-sm">
+          {step.error}
+        </p>
       )}
       {outcome.preview && (
         <details className="mt-2 text-sm">
@@ -118,7 +146,7 @@ export function RunTimeline({ runId }: { runId: string }) {
     refetchInterval: (q) =>
       pollDelay(q.state.data ? youngestActiveAge([q.state.data]) : null),
     retry: (count, error) =>
-      !NOT_FOUND_CODES.includes(error.data?.code ?? "") && count < 1
+      !NOT_FOUND_CODES.includes(error.data?.code ?? "") && count < 1,
   });
 
   if (query.isPending) return <ListSkeleton />;
@@ -159,7 +187,9 @@ export function RunTimeline({ runId }: { runId: string }) {
           Back to runs
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">{run.workflow.name}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {run.workflow.name}
+          </h1>
           <RunAction
             workflowId={run.workflowId}
             archived={run.workflow.status === "ARCHIVED"}
@@ -178,7 +208,12 @@ export function RunTimeline({ runId }: { runId: string }) {
       </header>
       <ol className="pt-2">
         {run.steps.map((step, index) => (
-          <TimelineStep key={step.id} step={step} isLast={index === run.steps.length - 1} />
+          <TimelineStep
+            key={step.id}
+            step={step}
+            isLast={index === run.steps.length - 1}
+            runStatus={run.status}
+          />
         ))}
       </ol>
     </div>
