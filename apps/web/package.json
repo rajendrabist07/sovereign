@@ -18,7 +18,7 @@
     "verify-sync-cache": "tsx --env-file=.env.local scripts/verify-sync-cache.mts",
     "verify": "pnpm run verify-ui-logic && pnpm run verify-sync-cache && pnpm run verify-session && pnpm run verify-rbac && pnpm run verify-audit && pnpm run verify-quota && pnpm run verify-runner && pnpm run verify-run-list",
     "verify-session": "tsx --env-file=.env.local scripts/verify-session.mts",
-    "dev:inngest": "cd \"$(mktemp -d)\" && npx --ignore-scripts=false inngest-cli@latest dev -u http://localhost:3000/api/inngest",
+    "dev:inngest": "cd \"$(mktemp -d)\" && npx --yes --ignore-scripts=false inngest-cli@1.49.0 dev -u http://localhost:3000/api/inngest",
     "verify-fast": "pnpm run verify-ui-logic && pnpm run verify-sync-cache && pnpm run verify-session && pnpm run verify-rbac && pnpm run verify-audit",
     "verify-ui-logic": "tsx --env-file=.env.local scripts/verify-ui-logic.mts"
   },
