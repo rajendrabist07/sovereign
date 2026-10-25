@@ -8,6 +8,15 @@
       "outputs": [
         ".next/**",
         "!.next/cache/**"
+      ],
+      "env": [
+        "RUNTIME_DATABASE_URL",
+        "DB_SSL_CA",
+        "DB_TX_MAX_WAIT_MS",
+        "DB_TX_TIMEOUT_MS",
+        "CLERK_SECRET_KEY",
+        "INNGEST_EVENT_KEY",
+        "INNGEST_SIGNING_KEY"
       ]
     },
     "dev": {
