@@ -1,11 +1,33 @@
 import { Prisma, PrismaClient } from "../generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import type { ConnectionOptions } from "node:tls";
+
+/**
+ * TLS settings for the database connection.
+ *
+ * With DB_SSL_CA set (the PEM text of the Supabase root CA, downloaded from
+ * Project Settings > Database > SSL Configuration) the server certificate and
+ * hostname are verified. The PEM comes from an env var rather than a file
+ * because serverless hosts have no stable file path. A backslash-n sequence in
+ * the value is turned into a newline so the PEM also fits one .env line.
+ *
+ * Without it: production refuses to start (fail closed), development falls
+ * back to an unverified connection (encrypted, but the server is not checked).
+ */
+function sslConfig(): ConnectionOptions {
+  const pem = process.env.DB_SSL_CA?.replace(/\\n/g, "\n");
+  if (pem) return { ca: pem, rejectUnauthorized: true };
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "DB_SSL_CA is required in production: set it to the Supabase root CA certificate (PEM text)."
+    );
+  }
+  return { rejectUnauthorized: false };
+}
 
 const adapter = new PrismaPg({
   connectionString: process.env.RUNTIME_DATABASE_URL,
-  // Supabase requires TLS. rejectUnauthorized:false skips CA verification,
-  // acceptable for local dev; revisit before production deploy.
-  ssl: { rejectUnauthorized: false },
+  ssl: sslConfig(),
   // Keep connections open between requests: a new one costs ~1.2 s
   // (TCP + TLS + auth at ~150 ms per round trip, Nepal to Seoul).
   idleTimeoutMillis: 300_000
