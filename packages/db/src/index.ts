@@ -23,15 +23,34 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 /**
+ * Reads a positive integer from the environment. A typo like "5s" throws
+ * at startup instead of silently falling back to the default, because a
+ * misconfigured timeout that nobody notices is worse than a crash.
+ */
+function positiveIntFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer (milliseconds), got "${raw}"`);
+  }
+  return value;
+}
+
+/**
  * Measured from a Nepal laptop to Supabase ap-northeast-2:
- * ~150ms per roundtrip, ~1200ms to open a brand-new connection.
+ * ~150ms per roundtrip, ~1200-1600ms to open a brand-new connection.
  * Prisma's defaults (maxWait 2000ms, timeout 5000ms) leave too little
  * margin on a cold connection, so we set them explicitly.
+ *
+ * The defaults suit that slow local link. In production, where the app
+ * runs next to the database, set DB_TX_MAX_WAIT_MS / DB_TX_TIMEOUT_MS
+ * lower so pool exhaustion fails fast instead of queueing for 10 s.
  */
 const TRANSACTION_OPTIONS = {
-  maxWait: 10_000,
-  timeout: 15_000
-} as const;
+  maxWait: positiveIntFromEnv("DB_TX_MAX_WAIT_MS", 10_000),
+  timeout: positiveIntFromEnv("DB_TX_TIMEOUT_MS", 15_000)
+};
 
 /**
  * Runs `fn` inside a transaction with Postgres' session-local
