@@ -20,7 +20,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata = {
   title: "Sovereign",
   description:
-    "Multi-tenant AI-native SaaS platform with autonomous workflow agents."
+    "Multi-tenant workflow automation with database-enforced tenant isolation, role-based access and an append-only audit log."
 } satisfies Metadata;
 
 export default function RootLayout({
