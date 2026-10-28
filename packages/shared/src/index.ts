@@ -93,3 +93,20 @@ export function quotaPeriod(now: Date): { month: string; resetAt: Date } {
     resetAt: new Date(Date.UTC(year, monthIndex + 1, 1))
   };
 }
+
+// Human approval gates. Events carry IDs only: the decision itself lives in
+// the approvals table, which is the source of truth.
+export const APPROVAL_DECISIONS = ["APPROVED", "REJECTED"] as const;
+export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number];
+
+export const approvalDecisionInputSchema = z.object({
+  approvalId: z.string().uuid(),
+  decision: z.enum(APPROVAL_DECISIONS),
+  note: z.string().trim().max(500).optional()
+});
+
+export const approvalDecidedEventSchema = z.object({
+  approvalId: z.string().uuid(),
+  runId: z.string().uuid(),
+  tenantId: z.string().min(1)
+});
