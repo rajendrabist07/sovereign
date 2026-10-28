@@ -141,7 +141,7 @@ model Approval {
   step   RunStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
-  @@index([stepId])
+  @@unique([stepId])
   @@map("approvals")
 }
 
