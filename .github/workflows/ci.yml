@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/setup@v1
+        with:
+          runtime: node@24
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @sovereign/db run generate
+
+      - name: Validate Prisma schema
+        run: pnpm --filter @sovereign/db exec prisma validate
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Checks that need no database
+        working-directory: apps/web
+        run: |
+          touch .env.local
+          pnpm run verify-ui-logic
+          pnpm run verify-sync-cache
+          pnpm run verify-session
+
+      - name: Build
+        env:
+          DB_SSL_CA: ci-placeholder
+          CLERK_SECRET_KEY: sk_test_placeholder
+        run: |
+          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_$(printf 'example.clerk.accounts.dev$' | base64)"
+          pnpm run build
