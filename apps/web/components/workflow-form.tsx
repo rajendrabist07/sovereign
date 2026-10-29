@@ -157,7 +157,7 @@ function StepFields({
             </Field>
           )}
         </>
-      ) : (
+      ) : step.type === "WAIT" ? (
         <Field
           label="Seconds to wait"
           hint="Between 1 and 604800 (7 days)."
@@ -176,6 +176,30 @@ function StepFields({
             />
           )}
         </Field>
+      ) : (
+        <>
+          <p className="text-sm text-muted">
+            The run pauses here until an admin approves or rejects it. A rejection
+            stops the run, and with no decision in 7 days the run fails.
+          </p>
+          <Field
+            label="Instructions for the approver"
+            hint="Shown on the approvals page. Optional."
+            error={errors[`${path}.instructions`]}
+          >
+            {({ id, describedBy, invalid }) => (
+              <textarea
+                id={id}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+                rows={3}
+                className={cn(controlClass(invalid), "h-auto py-2")}
+                value={step.instructions}
+                onChange={(e) => onChange({ ...step, instructions: e.target.value })}
+              />
+            )}
+          </Field>
+        </>
       )}
     </li>
   );
@@ -243,6 +267,8 @@ export function WorkflowForm({
     else create.mutate(result.input);
   }
 
+  const full = draft.steps.length >= MAX_STEPS;
+
   return (
     <form onSubmit={submit} noValidate className="max-w-2xl space-y-8">
       <Field label="Workflow name" error={errors.name}>
@@ -287,19 +313,14 @@ export function WorkflowForm({
           ))}
         </ol>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="quiet"
-            disabled={draft.steps.length >= MAX_STEPS}
-            onClick={() => addStep("HTTP_REQUEST")}
-          >
+          <Button variant="quiet" disabled={full} onClick={() => addStep("HTTP_REQUEST")}>
             Add HTTP request
           </Button>
-          <Button
-            variant="quiet"
-            disabled={draft.steps.length >= MAX_STEPS}
-            onClick={() => addStep("WAIT")}
-          >
+          <Button variant="quiet" disabled={full} onClick={() => addStep("WAIT")}>
             Add wait
+          </Button>
+          <Button variant="quiet" disabled={full} onClick={() => addStep("MANUAL_APPROVAL")}>
+            Add approval
           </Button>
         </div>
       </section>

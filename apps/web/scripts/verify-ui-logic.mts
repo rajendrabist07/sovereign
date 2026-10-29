@@ -148,10 +148,86 @@ const back = validated.ok
 const normalize = (d: Draft | null) =>
   JSON.stringify(d && { ...d, steps: d.steps.map((s) => ({ ...s, key: "k" })) });
 check("draft -> definition -> draft round trip is lossless", normalize(back) === normalize(roundTripDraft));
-check(
-  "an approval step makes the workflow non-editable here",
-  workflowToDraft({ name: "x", definition: { steps: [{ type: "MANUAL_APPROVAL", name: "OK?" }] } }, () => "k") === null
-);
+function checkApprovalSteps() {
+  let n = 0;
+  const nextKey = () => "k" + String(++n);
+  const signOff: Draft = {
+    name: "Sign-off flow",
+    steps: [
+      {
+        key: "approval-1",
+        type: "MANUAL_APPROVAL",
+        name: "Manager sign-off",
+        instructions: "Check the numbers"
+      }
+    ]
+  };
+
+  const fresh = newStep("MANUAL_APPROVAL", "x");
+  check(
+    "a new approval step starts with a name and no instructions",
+    fresh.type === "MANUAL_APPROVAL" && fresh.name.length > 0 && fresh.instructions === ""
+  );
+
+  const valid = validateDraft(signOff);
+  const validStep = valid.ok ? valid.input.definition.steps[0] : undefined;
+  check(
+    "a valid approval step passes and keeps its instructions",
+    validStep?.type === "MANUAL_APPROVAL" && validStep.instructions === "Check the numbers"
+  );
+
+  const blank = validateDraft({
+    ...signOff,
+    steps: [{ key: "a", type: "MANUAL_APPROVAL", name: "Sign off", instructions: "   " }]
+  });
+  const blankStep = blank.ok ? blank.input.definition.steps[0] : undefined;
+  check(
+    "blank instructions are left out instead of sent as empty text",
+    blankStep?.type === "MANUAL_APPROVAL" && blankStep.instructions === undefined
+  );
+
+  const noName = validateDraft({
+    ...signOff,
+    steps: [{ key: "a", type: "MANUAL_APPROVAL", name: "  ", instructions: "" }]
+  });
+  check(
+    "an approval step needs a name",
+    !noName.ok && noName.errors["steps.0.name"] === "Required"
+  );
+
+  const tooLong = validateDraft({
+    ...signOff,
+    steps: [
+      { key: "a", type: "MANUAL_APPROVAL", name: "Sign off", instructions: "x".repeat(1001) }
+    ]
+  });
+  check(
+    "instructions over 1000 characters are rejected",
+    !tooLong.ok && tooLong.errors["steps.0.instructions"] === "Too long"
+  );
+
+  const back = valid.ok
+    ? workflowToDraft({ name: valid.input.name, definition: valid.input.definition }, nextKey)
+    : null;
+  const backStep = back?.steps[0];
+  check(
+    "an approval workflow can be edited: it round-trips through the draft",
+    backStep?.type === "MANUAL_APPROVAL" &&
+      backStep.name === "Manager sign-off" &&
+      backStep.instructions === "Check the numbers"
+  );
+
+  const bare = workflowToDraft(
+    { name: "x", definition: { steps: [{ type: "MANUAL_APPROVAL", name: "Sign off" }] } },
+    nextKey
+  );
+  const bareStep = bare?.steps[0];
+  check(
+    "a stored approval step without instructions opens with an empty field",
+    bareStep?.type === "MANUAL_APPROVAL" && bareStep.instructions === ""
+  );
+}
+checkApprovalSteps();
 check("an invalid stored definition is non-editable", workflowToDraft({ name: "x", definition: { steps: [] } }, () => "k") === null);
 
 check("moveStep: swaps forward", JSON.stringify(moveStep([1, 2, 3], 0, 1)) === "[2,1,3]");

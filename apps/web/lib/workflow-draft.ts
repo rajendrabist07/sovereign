@@ -18,7 +18,8 @@ export type DraftStep =
       url: string;
       body: string;
     }
-  | { key: string; type: "WAIT"; name: string; seconds: string };
+  | { key: string; type: "WAIT"; name: string; seconds: string }
+  | { key: string; type: "MANUAL_APPROVAL"; name: string; instructions: string };
 
 export type Draft = { name: string; steps: DraftStep[] };
 
@@ -28,9 +29,14 @@ export type FieldErrors = Record<string, string>;
 type WorkflowInput = ReturnType<typeof workflowInputSchema.parse>;
 
 export function newStep(type: DraftStep["type"], key: string): DraftStep {
-  return type === "WAIT"
-    ? { key, type, name: "Wait", seconds: "60" }
-    : { key, type, name: "Call an API", method: "GET", url: "", body: "" };
+  switch (type) {
+    case "WAIT":
+      return { key, type, name: "Wait", seconds: "60" };
+    case "MANUAL_APPROVAL":
+      return { key, type, name: "Wait for approval", instructions: "" };
+    case "HTTP_REQUEST":
+      return { key, type, name: "Call an API", method: "GET", url: "", body: "" };
+  }
 }
 
 export function moveStep<T>(items: readonly T[], from: number, to: number): T[] {
@@ -46,14 +52,23 @@ export function draftToInput(draft: Draft) {
   return {
     name: draft.name,
     definition: {
-      steps: draft.steps.map((step) =>
-        step.type === "WAIT"
-          ? {
+      steps: draft.steps.map((step) => {
+        switch (step.type) {
+          case "WAIT":
+            return {
               type: "WAIT" as const,
               name: step.name,
               seconds: step.seconds.trim() === "" ? Number.NaN : Number(step.seconds)
-            }
-          : {
+            };
+          case "MANUAL_APPROVAL":
+            return {
+              type: "MANUAL_APPROVAL" as const,
+              name: step.name,
+              // Blank instructions are left out rather than sent as "".
+              ...(step.instructions.trim() ? { instructions: step.instructions.trim() } : {})
+            };
+          case "HTTP_REQUEST":
+            return {
               type: "HTTP_REQUEST" as const,
               name: step.name,
               method: step.method,
@@ -62,8 +77,9 @@ export function draftToInput(draft: Draft) {
               ...(METHODS_WITH_BODY.includes(step.method) && step.body.trim()
                 ? { body: step.body }
                 : {})
-            }
-      )
+            };
+        }
+      })
     }
   };
 }
@@ -114,7 +130,7 @@ export function validateDraft(
   return { ok: false, errors };
 }
 
-/** Null when the editor cannot represent this workflow (invalid, or a step type it lacks). */
+/** Null when the editor cannot represent this workflow (its saved definition is invalid). */
 export function workflowToDraft(
   workflow: { name: string; definition: unknown },
   newKey: () => string
@@ -140,8 +156,18 @@ export function workflowToDraft(
         name: step.name,
         seconds: String(step.seconds)
       });
+    } else if (step.type === "MANUAL_APPROVAL") {
+      steps.push({
+        key: newKey(),
+        type: "MANUAL_APPROVAL",
+        name: step.name,
+        instructions: step.instructions ?? ""
+      });
     } else {
-      return null;
+      // Exhaustive: a new step type in the shared schema fails the build here
+      // until the editor knows how to show it.
+      const unsupported: never = step;
+      return unsupported;
     }
   }
   return { name: workflow.name, steps };

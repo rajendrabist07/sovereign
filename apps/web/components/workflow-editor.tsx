@@ -66,7 +66,7 @@ export function WorkflowEditor({ workflowId }: { workflowId?: string }) {
     return (
       <ListEmpty
         title="This workflow can't be edited here yet"
-        hint="It uses a step type the editor doesn't support yet."
+        hint="Its saved definition is not valid, so it cannot be shown in the editor."
       />
     );
   }
