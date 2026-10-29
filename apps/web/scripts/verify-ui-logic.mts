@@ -35,6 +35,22 @@ check(
   "a PENDING step in a PENDING run is still queued",
   stepDisplayStatus("PENDING", "PENDING") === "PENDING"
 );
+check(
+  "a RUNNING approval step shows as waiting for approval",
+  stepDisplayStatus("RUNNING", "RUNNING", "MANUAL_APPROVAL") === "AWAITING_APPROVAL"
+);
+check(
+  "a RUNNING wait step is still just running",
+  stepDisplayStatus("RUNNING", "RUNNING", "WAIT") === "RUNNING"
+);
+check(
+  "a COMPLETED approval step stays COMPLETED",
+  stepDisplayStatus("RUNNING", "COMPLETED", "MANUAL_APPROVAL") === "COMPLETED"
+);
+check(
+  "an approval step that never started in a FAILED run is skipped, not waiting",
+  stepDisplayStatus("FAILED", "PENDING", "MANUAL_APPROVAL") === "SKIPPED"
+);
 
 // formatting
 check("duration: 0 ms", formatDuration(0) === "0 ms");

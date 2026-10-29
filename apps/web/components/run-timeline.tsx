@@ -23,6 +23,10 @@ const httpOutput = z.object({
   bodyPreview: z.string().optional(),
 });
 const waitOutput = z.object({ waitedSeconds: z.number() });
+const approvalOutput = z.object({
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  note: z.string().nullable()
+});
 
 const NODE: Record<StatusDotValue, string> = {
   PENDING: "border-line bg-paper",
@@ -30,6 +34,7 @@ const NODE: Record<StatusDotValue, string> = {
   COMPLETED: "border-done bg-done",
   FAILED: "border-failed bg-failed",
   SKIPPED: "border-line bg-paper",
+  AWAITING_APPROVAL: "border-running bg-surface motion-safe:animate-pulse",
 };
 
 function describe(definition: WorkflowStep): string {
@@ -67,6 +72,12 @@ function outcomeOf(step: Step): {
   const wait = waitOutput.safeParse(step.output);
   if (wait.success)
     return { text: `Waited ${wait.data.waitedSeconds} s`, preview: null };
+  const approval = approvalOutput.safeParse(step.output);
+  if (approval.success) {
+    const label = approval.data.decision === "APPROVED" ? "Approved" : "Rejected";
+    const text = approval.data.note ? `${label}: ${approval.data.note}` : label;
+    return { text, preview: null };
+  }
   return { text: took, preview: null };
 }
 
@@ -88,7 +99,7 @@ function TimelineStep({
     : step.type;
   const detail = definition.success ? describe(definition.data) : null;
   const outcome = outcomeOf(step);
-  const status = stepDisplayStatus(runStatus, step.status);
+  const status = stepDisplayStatus(runStatus, step.status, step.type);
 
   return (
     <li className="relative pb-8 pl-9 last:pb-0">
