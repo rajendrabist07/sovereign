@@ -23,7 +23,8 @@
     "verify-ui-logic": "tsx --env-file=.env.local scripts/verify-ui-logic.mts",
     "verify-quota-refund": "tsx --env-file=.env.local scripts/verify-quota-refund.mts",
     "verify-approval-logic": "tsx --env-file=.env.local scripts/verify-approval-logic.mts",
-    "verify-approval": "tsx --env-file=.env.local scripts/verify-approval.mts"
+    "verify-approval": "tsx --env-file=.env.local scripts/verify-approval.mts",
+    "seed-demo": "tsx --env-file=.env.local scripts/seed-demo.mts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.11",
