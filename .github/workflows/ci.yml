@@ -47,6 +47,7 @@ jobs:
           pnpm run verify-sync-cache
           pnpm run verify-session
           pnpm run verify-approval-logic
+          pnpm run verify-agent-logic
 
       - name: Build
         env:
