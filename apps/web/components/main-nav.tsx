@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/workflows", label: "Workflows" },
-  { href: "/runs", label: "Runs" }
+  { href: "/runs", label: "Runs" },
+  { href: "/approvals", label: "Approvals" }
 ] as const;
 
 export function MainNav({ className }: { className?: string }) {
