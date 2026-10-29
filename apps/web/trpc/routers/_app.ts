@@ -1,4 +1,5 @@
 import { createCallerFactory, router, sessionProcedure } from "../init";
+import { approvalRouter } from "./approval";
 import { quotaRouter } from "./quota";
 import { runRouter } from "./run";
 import { workflowRouter } from "./workflow";
@@ -8,7 +9,8 @@ export const appRouter = router({
   me: sessionProcedure.query(({ ctx }) => ({ role: ctx.session.role })),
   workflow: workflowRouter,
   run: runRouter,
-  quota: quotaRouter
+  quota: quotaRouter,
+  approval: approvalRouter
 });
 
 export type AppRouter = typeof appRouter;

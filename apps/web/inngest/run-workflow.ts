@@ -1,6 +1,11 @@
 import { NonRetriableError } from "inngest";
 import { withTenant } from "@sovereign/db";
 import { runRequestedEventSchema, stepSchema } from "@sovereign/shared";
+import {
+  APPROVAL_DECIDED_EVENT,
+  APPROVAL_TIMEOUT,
+  approvalOutcome
+} from "../lib/runs/approval";
 import { recordStep } from "../lib/runs/state";
 import { inngest } from "./client";
 import { executeHttpStep } from "./http-step";
@@ -9,7 +14,8 @@ import { executeHttpStep } from "./http-step";
  * Remember the replay rule: everything outside step.run() executes again
  * on every replay, so it must be pure control flow. All DB writes and
  * network calls live inside step.run() / step.sleep().
- * Quota: each step.run() counts as one execution on the free tier.
+ * Quota: each step.run() counts as one execution on the free tier. An
+ * approval step costs three (request, wait, finish).
  */
 export const runWorkflow = inngest.createFunction(
   { id: "run-workflow", triggers: { event: "workflow/run.requested" } },
@@ -65,9 +71,64 @@ export const runWorkflow = inngest.createFunction(
               })
             )
           );
+        } else if (definition.type === "MANUAL_APPROVAL") {
+          // 1. Create the request (once, even if this step is retried) and
+          //    mark the step as waiting. The unique index on stepId makes the
+          //    insert idempotent.
+          const approvalId = await step.run(`step-${i}-request`, () =>
+            withTenant(tenantId, async (tx) => {
+              const row = await tx.runStep.findFirstOrThrow({
+                where: { runId, stepIndex: i },
+                select: { id: true }
+              });
+              await tx.approval.createMany({
+                data: [{ tenantId, runId, stepId: row.id }],
+                skipDuplicates: true
+              });
+              const approval = await tx.approval.findUniqueOrThrow({
+                where: { stepId: row.id },
+                select: { id: true }
+              });
+              await recordStep(tx, runId, i, { status: "RUNNING" });
+              return approval.id;
+            })
+          );
+
+          // 2. Sleep until a decision event arrives or the timeout passes.
+          //    Only events sent AFTER this step starts are caught, so the
+          //    event is a nudge: the decision itself is read from the DB.
+          //    approvalId is a uuid from our own database, never user input.
+          const wake = await step.waitForEvent(`step-${i}-wait`, {
+            event: APPROVAL_DECIDED_EVENT,
+            timeout: APPROVAL_TIMEOUT,
+            if: `event.data.runId == async.data.runId && async.data.approvalId == '${approvalId}'`
+          });
+
+          // 3. Read the decision and finish (or fail) the step.
+          await step.run(`step-${i}-finish`, () =>
+            withTenant(tenantId, async (tx) => {
+              const row = await tx.approval.findUnique({
+                where: { id: approvalId },
+                select: { decision: true, decidedBy: true, note: true }
+              });
+              const outcome = approvalOutcome(row, wake === null);
+              // A rejection or expiry fails the run through the same path as
+              // any other failing step.
+              if (outcome.status === "FAILED") {
+                throw new NonRetriableError(outcome.error);
+              }
+              await recordStep(tx, runId, i, {
+                status: "COMPLETED",
+                output: outcome.output
+              });
+            })
+          );
         } else {
+          // Compile-time exhaustiveness: adding a step type to the shared
+          // schema fails the build here until the runner handles it.
+          const unsupported: never = definition;
           throw new NonRetriableError(
-            `${definition.type} steps are not supported yet`
+            `Unsupported step: ${JSON.stringify(unsupported)}`
           );
         }
       }

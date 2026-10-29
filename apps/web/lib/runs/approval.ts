@@ -3,6 +3,9 @@ import type { ApprovalDecision } from "@sovereign/shared";
 /** How long a run waits for a human before the approval step fails. */
 export const APPROVAL_TIMEOUT = "7d";
 
+/** Wakes a run that is waiting on an approval. Carries IDs only. */
+export const APPROVAL_DECIDED_EVENT = "workflow/approval.decided";
+
 export type ApprovalRow = {
   decision: string | null;
   decidedBy: string | null;
