@@ -1,4 +1,4 @@
-import { z } from "@sovereign/shared";
+import { getPlanLimits, PLAN_LIMITS, stepSchema, z } from "@sovereign/shared";
 import { AgentError, DEFAULT_LIMITS, runAgent } from "../lib/agent/executor";
 import type { LlmClient, LlmRequest, ToolCall } from "../lib/agent/llm";
 import { defineTool, ToolError } from "../lib/agent/tool";
@@ -347,6 +347,41 @@ check(
 check(
   "every tool tells the model its arguments are closed",
   lookup.spec.parameters.additionalProperties === false && leaky.spec.parameters.additionalProperties === false
+);
+
+// The agent step's definition and the token limits
+const agentStep = {
+  type: "AGENT",
+  name: "Summarise",
+  task: "Summarise the lead",
+  tools: ["http_get"],
+  allowedHosts: ["example.com"]
+};
+check("an agent step with a task, tools and hosts is valid", stepSchema.safeParse(agentStep).success);
+check(
+  "an agent step can have no tools and no hosts",
+  stepSchema.safeParse({ ...agentStep, tools: [], allowedHosts: [] }).success
+);
+check("an unknown tool name is rejected", !stepSchema.safeParse({ ...agentStep, tools: ["shell"] }).success);
+check("an empty task is rejected", !stepSchema.safeParse({ ...agentStep, task: "   " }).success);
+check("a task over 2000 characters is rejected", !stepSchema.safeParse({ ...agentStep, task: "x".repeat(2001) }).success);
+check(
+  "more than 10 allowed hosts are rejected",
+  !stepSchema.safeParse({ ...agentStep, allowedHosts: Array.from({ length: 11 }, (_, i) => `h${i}.example.com`) }).success
+);
+check("a single label is rejected: there is nothing to choose", !stepSchema.safeParse({ ...agentStep, labels: ["only"] }).success);
+check("two labels are enough", stepSchema.safeParse({ ...agentStep, labels: ["hot", "cold"] }).success);
+check(
+  "more than ten labels are rejected",
+  !stepSchema.safeParse({ ...agentStep, labels: Array.from({ length: 11 }, (_, i) => `l${i}`) }).success
+);
+check(
+  "every plan has a token limit and pro has more than free",
+  PLAN_LIMITS.free.tokensPerMonth > 0 && PLAN_LIMITS.pro.tokensPerMonth > PLAN_LIMITS.free.tokensPerMonth
+);
+check(
+  "an unknown plan gets the free token limit",
+  getPlanLimits("nonsense").tokensPerMonth === PLAN_LIMITS.free.tokensPerMonth
 );
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) FAILED.`);

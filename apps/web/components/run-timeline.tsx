@@ -27,6 +27,13 @@ const approvalOutput = z.object({
   decision: z.enum(["APPROVED", "REJECTED"]),
   note: z.string().nullable()
 });
+const agentOutput = z.object({
+  format: z.enum(["text", "labels"]),
+  text: z.string().optional(),
+  label: z.string().optional(),
+  reason: z.string().optional(),
+  tokensUsed: z.number()
+});
 
 const NODE: Record<StatusDotValue, string> = {
   PENDING: "border-line bg-paper",
@@ -45,6 +52,8 @@ function describe(definition: WorkflowStep): string {
       return `Pause for ${definition.seconds} s`;
     case "MANUAL_APPROVAL":
       return definition.instructions ?? "Waits for a person to approve";
+    case "AGENT":
+      return definition.task;
   }
 }
 
@@ -72,6 +81,17 @@ function outcomeOf(step: Step): {
   const wait = waitOutput.safeParse(step.output);
   if (wait.success)
     return { text: `Waited ${wait.data.waitedSeconds} s`, preview: null };
+  const agent = agentOutput.safeParse(step.output);
+  if (agent.success) {
+    const { format, label, reason, text, tokensUsed } = agent.data;
+    return {
+      text:
+        format === "labels" && label
+          ? `Classified as "${label}"${reason ? `: ${reason}` : ""}`
+          : `${tokensUsed} tokens used`,
+      preview: format === "text" ? (text ?? null) : null
+    };
+  }
   const approval = approvalOutput.safeParse(step.output);
   if (approval.success) {
     const label = approval.data.decision === "APPROVED" ? "Approved" : "Rejected";

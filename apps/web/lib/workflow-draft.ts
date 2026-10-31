@@ -163,6 +163,9 @@ export function workflowToDraft(
         name: step.name,
         instructions: step.instructions ?? ""
       });
+    } else if (step.type === "AGENT") {
+      // The builder cannot edit agent steps yet.
+      return null;
     } else {
       // Exhaustive: a new step type in the shared schema fails the build here
       // until the editor knows how to show it.

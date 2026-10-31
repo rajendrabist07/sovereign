@@ -8,7 +8,9 @@ import {
 } from "../lib/runs/approval";
 import { recordStep } from "../lib/runs/state";
 import { inngest } from "./client";
+import { executeAgentStep } from "./agent-step";
 import { executeHttpStep } from "./http-step";
+import { getLlmClient } from "./llm";
 
 /**
  * Remember the replay rule: everything outside step.run() executes again
@@ -121,6 +123,19 @@ export const runWorkflow = inngest.createFunction(
                 status: "COMPLETED",
                 output: outcome.output
               });
+            })
+          );
+        } else if (definition.type === "AGENT") {
+          // The model call and its tools run outside any database transaction.
+          // A model-client error such as a rate limit is retried by Inngest;
+          // an agent that fails its own checks is not.
+          await step.run(`step-${i}`, () =>
+            executeAgentStep({
+              tenantId,
+              runId,
+              stepIndex: i,
+              definition,
+              llm: getLlmClient()
             })
           );
         } else {

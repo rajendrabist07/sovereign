@@ -14,6 +14,10 @@ export function roleAtLeast(actual: Role, required: Role): boolean {
 
 const stepName = z.string().trim().min(1).max(100);
 
+/** Tools an agent step can be given. Each is read-only. */
+export const AGENT_TOOLS = ["http_get", "query_runs"] as const;
+export type AgentToolName = (typeof AGENT_TOOLS)[number];
+
 export const stepSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("HTTP_REQUEST"),
@@ -31,6 +35,17 @@ export const stepSchema = z.discriminatedUnion("type", [
     type: z.literal("MANUAL_APPROVAL"),
     name: stepName,
     instructions: z.string().max(1000).optional()
+  }),
+  z.object({
+    type: z.literal("AGENT"),
+    name: stepName,
+    // Written by a workflow admin, so it is trusted. Outside data never goes here.
+    task: z.string().trim().min(1).max(2000),
+    tools: z.array(z.enum(AGENT_TOOLS)).max(AGENT_TOOLS.length),
+    // Hosts the http_get tool may reach; checked again where the tool is built.
+    allowedHosts: z.array(z.string().trim().toLowerCase().min(1).max(253)).max(10),
+    // When set, the agent must answer with one of these labels and a reason.
+    labels: z.array(z.string().trim().min(1).max(40)).min(2).max(10).optional()
   })
 ]);
 
@@ -71,8 +86,8 @@ export const runRequestedEventSchema = z.object({
 // Monthly run limits per plan. Unknown plans fall back to the most
 // restrictive one (free), never to an unlimited default.
 export const PLAN_LIMITS = {
-  free: { runsPerMonth: 100 },
-  pro: { runsPerMonth: 5000 }
+  free: { runsPerMonth: 100, tokensPerMonth: 100_000 },
+  pro: { runsPerMonth: 5000, tokensPerMonth: 2_000_000 }
 } as const;
 
 export type PlanName = keyof typeof PLAN_LIMITS;
