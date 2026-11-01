@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { NonRetriableError } from "inngest";
 import { prisma, withTenant } from "@sovereign/db";
 import { getPlanLimits, quotaPeriod, type WorkflowStep } from "@sovereign/shared";
 import { executeAgentStep, TOKEN_LIMIT_MESSAGE } from "../inngest/agent-step";
@@ -95,12 +94,20 @@ async function seedRun(
   });
 }
 
+// Judged by name, not instanceof: this script is an ES module and the code
+// under test is CommonJS, so they can load two copies of the library and
+// instanceof then fails for the very same error.
+let lastError: unknown;
 async function outcome(promise: Promise<unknown>): Promise<"ok" | "non-retriable" | "retriable"> {
+  lastError = undefined;
   try {
     await promise;
     return "ok";
   } catch (error) {
-    return error instanceof NonRetriableError ? "non-retriable" : "retriable";
+    lastError = error;
+    return (error as { name?: string } | null)?.name === "NonRetriableError"
+      ? "non-retriable"
+      : "retriable";
   }
 }
 
@@ -279,7 +286,10 @@ try {
     const { llm } = scriptedLlm([{ error: new Error("429 rate limited") }]);
     const kind = await outcome(executeAgentStep({ tenantId: tenantA, runId: run.id, stepIndex: 0, definition: agent(), llm }));
     const row = await stepRow(tenantA, run.id, 0);
-    check("a rate-limit error from the model is retried, not turned into a failure", kind === "retriable");
+    check(
+      "a rate-limit error from the model is retried, not turned into a failure",
+      kind === "retriable" && lastError instanceof Error && lastError.message === "429 rate limited"
+    );
     check("the step stays RUNNING while it waits for the retry", row?.status === "RUNNING");
     check("no tokens are counted for it", (await tokensNow(tenantA)) === before);
   }
