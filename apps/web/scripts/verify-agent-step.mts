@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { prisma, withTenant } from "@sovereign/db";
 import { getPlanLimits, quotaPeriod, type WorkflowStep } from "@sovereign/shared";
 import { executeAgentStep, TOKEN_LIMIT_MESSAGE } from "../inngest/agent-step";
-import type { LlmClient, LlmRequest, ToolCall } from "../lib/agent/llm";
+import { LlmProviderError, type LlmClient, type LlmRequest, type ToolCall } from "../lib/agent/llm";
 import { createCaller } from "../trpc/routers/_app";
 
 // Needs the database only: the model is scripted, so no Inngest and no network.
@@ -292,6 +292,40 @@ try {
     );
     check("the step stays RUNNING while it waits for the retry", row?.status === "RUNNING");
     check("no tokens are counted for it", (await tokensNow(tenantA)) === before);
+  }
+  // Failures of the model provider: some end the step, some are retried.
+  {
+    const before = await tokensNow(tenantA);
+    const run = async () => seedRun(tenantA, workflow.id, [agent()]);
+    const attempt = async (error: LlmProviderError) => {
+      const seeded = await run();
+      const kind = await outcome(
+        executeAgentStep({
+          tenantId: tenantA, runId: seeded.id, stepIndex: 0, definition: agent(),
+          llm: scriptedLlm([{ error }]).llm
+        })
+      );
+      return { kind, name: (lastError as { name?: string } | null)?.name, row: await stepRow(tenantA, seeded.id, 0) };
+    };
+
+    const rejected = await attempt(new LlmProviderError("The AI provider rejected the API key", { retryable: false }));
+    check(
+      "a provider error that retrying cannot fix fails the step with its safe message",
+      rejected.kind === "non-retriable" &&
+        rejected.row?.status === "FAILED" &&
+        rejected.row.error === "The AI provider rejected the API key"
+    );
+    const limited = await attempt(new LlmProviderError("The AI provider is rate limited", { retryable: true, retryAfterMs: 12_000 }));
+    check(
+      "a rate limit is retried after the wait the provider asked for",
+      limited.kind === "retriable" && limited.name === "RetryAfterError" && limited.row?.status === "RUNNING"
+    );
+    const outage = await attempt(new LlmProviderError("The AI provider had a problem, try again", { retryable: true }));
+    check(
+      "an outage is retried with the queue's own backoff",
+      outage.kind === "retriable" && outage.name !== "RetryAfterError" && outage.row?.status === "RUNNING"
+    );
+    check("none of those counted any tokens", (await tokensNow(tenantA)) === before);
   }
 } finally {
   for (const id of [tenantA, tenantB]) {

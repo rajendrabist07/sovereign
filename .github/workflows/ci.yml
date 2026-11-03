@@ -49,6 +49,7 @@ jobs:
           pnpm run verify-approval-logic
           pnpm run verify-agent-logic
           pnpm run verify-safe-fetch
+          pnpm run verify-groq-adapter
 
       - name: Build
         env:

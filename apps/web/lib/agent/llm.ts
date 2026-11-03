@@ -37,3 +37,27 @@ export type LlmResponse = {
 export interface LlmClient {
   complete(request: LlmRequest): Promise<LlmResponse>;
 }
+
+/**
+ * A failure of the model provider that the caller can act on. The message is
+ * written to be safe to store and to show: it never contains the provider's
+ * response body, the request or the API key.
+ */
+export class LlmProviderError extends Error {
+  readonly retryable: boolean;
+  /** How long the provider asked us to wait, when it said. */
+  readonly retryAfterMs: number | null;
+
+  constructor(message: string, options: { retryable: boolean; retryAfterMs?: number | null }) {
+    super(message);
+    this.name = "LlmProviderError";
+    this.retryable = options.retryable;
+    this.retryAfterMs = options.retryAfterMs ?? null;
+  }
+}
+
+/** By name and shape, not instanceof: see the note in verify-agent-step about duplicate module copies. */
+export function isLlmProviderError(error: unknown): error is LlmProviderError {
+  const candidate = error as { name?: unknown; retryable?: unknown } | null;
+  return candidate?.name === "LlmProviderError" && typeof candidate.retryable === "boolean";
+}

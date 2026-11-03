@@ -1,10 +1,14 @@
 import { NonRetriableError } from "inngest";
+import { createGroqClient } from "../lib/agent/groq";
 import type { LlmClient } from "../lib/agent/llm";
 
 /**
- * Placeholder until the real provider adapter is added. An agent step fails
- * with this message instead of silently doing nothing.
+ * The language model for agent steps. Without a key the step fails with a
+ * clear message instead of silently doing nothing.
  */
 export function getLlmClient(): LlmClient {
-  throw new NonRetriableError("No language model is configured yet");
+  const apiKey = process.env.GROQ_API_KEY?.trim();
+  if (!apiKey) throw new NonRetriableError("No language model is configured yet");
+  const model = process.env.GROQ_MODEL?.trim();
+  return createGroqClient({ apiKey, ...(model ? { model } : {}) });
 }

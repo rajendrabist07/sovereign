@@ -1,4 +1,4 @@
-import { NonRetriableError } from "inngest";
+import { NonRetriableError, RetryAfterError } from "inngest";
 import { withTenant } from "@sovereign/db";
 import { getPlanLimits, stepSchema, z, type WorkflowStep } from "@sovereign/shared";
 import {
@@ -8,7 +8,7 @@ import {
   type AgentResult,
   type AnswerFormat
 } from "../lib/agent/executor";
-import type { LlmClient } from "../lib/agent/llm";
+import { isLlmProviderError, type LlmClient } from "../lib/agent/llm";
 import type { AgentTool } from "../lib/agent/tool";
 import { httpGetTool } from "../lib/agent/tools/http-get";
 import { queryRunsTool } from "../lib/agent/tools/query-runs";
@@ -163,6 +163,17 @@ export async function executeAgentStep(args: {
         await recordStep(tx, runId, stepIndex, { status: "FAILED", error: error.message });
       });
       throw new NonRetriableError(error.message, { cause: error });
+    }
+    if (isLlmProviderError(error)) {
+      if (!error.retryable) {
+        // A bad key or a removed model: retrying cannot help.
+        await failStep(tenantId, runId, stepIndex, error.message);
+        throw new NonRetriableError(error.message, { cause: error });
+      }
+      if (error.retryAfterMs !== null) {
+        // The provider said how long to wait, so wait exactly that.
+        throw new RetryAfterError(error.message, `${Math.max(1, Math.ceil(error.retryAfterMs / 1000))}s`);
+      }
     }
     // Anything else came from the model client: let Inngest retry it.
     throw error;
