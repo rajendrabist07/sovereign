@@ -228,6 +228,165 @@ function checkApprovalSteps() {
   );
 }
 checkApprovalSteps();
+
+function checkAgentSteps() {
+  let n = 0;
+  const nextKey = () => "a" + String(++n);
+  const agentDraft = (overrides: Partial<Extract<DraftStep, { type: "AGENT" }>> = {}): Draft => ({
+    name: "Lead flow",
+    steps: [
+      {
+        key: "agent-1",
+        type: "AGENT",
+        name: "Assess lead",
+        task: "Assess the lead",
+        tools: [],
+        allowedHosts: "",
+        labels: "",
+        ...overrides
+      }
+    ]
+  });
+  const agentOf = (draft: Draft) => {
+    const result = validateDraft(draft);
+    const step = result.ok ? result.input.definition.steps[0] : undefined;
+    return { result, step: step?.type === "AGENT" ? step : undefined };
+  };
+  const errorsOf = (draft: Draft): Record<string, string> => {
+    const result = validateDraft(draft);
+    return result.ok ? {} : result.errors;
+  };
+
+  const fresh = newStep("AGENT", "x");
+  check(
+    "a new agent step starts with a name and nothing else filled in",
+    fresh.type === "AGENT" &&
+      fresh.name.length > 0 &&
+      fresh.task === "" &&
+      fresh.tools.length === 0 &&
+      fresh.allowedHosts === "" &&
+      fresh.labels === ""
+  );
+
+  const plain = agentOf(agentDraft());
+  check(
+    "an agent with only a task is valid",
+    plain.result.ok && plain.step?.task === "Assess the lead" && plain.step.tools.length === 0
+  );
+  check(
+    "with no labels the answer is free text: labels are left out",
+    plain.step !== undefined && plain.step.labels === undefined
+  );
+  check("an agent needs a task", errorsOf(agentDraft({ task: "   " }))["steps.0.task"] === "Required");
+  check(
+    "a task over 2000 characters is too long",
+    errorsOf(agentDraft({ task: "x".repeat(2001) }))["steps.0.task"] === "Too long"
+  );
+  check("an agent needs a name", errorsOf(agentDraft({ name: " " }))["steps.0.name"] === "Required");
+
+  const withTools = agentOf(
+    agentDraft({
+      tools: ["query_runs", "http_get"],
+      allowedHosts: "Example.COM\n\n  *.api.example.com  \nexample.com"
+    })
+  );
+  check(
+    "hosts are split by line, trimmed, lower-cased and de-duplicated",
+    withTools.step !== undefined &&
+      JSON.stringify(withTools.step.allowedHosts) === JSON.stringify(["example.com", "*.api.example.com"])
+  );
+  check(
+    "tools are saved in a fixed order",
+    withTools.step !== undefined &&
+      JSON.stringify(withTools.step.tools) === JSON.stringify(["http_get", "query_runs"])
+  );
+
+  const hostsIgnored = agentOf(agentDraft({ tools: ["query_runs"], allowedHosts: "not a host at all" }));
+  check(
+    "hosts typed while http_get is off are ignored: not validated and not saved",
+    hostsIgnored.result.ok && hostsIgnored.step?.allowedHosts.length === 0
+  );
+  check(
+    "http_get with no hosts is an error",
+    errorsOf(agentDraft({ tools: ["http_get"], allowedHosts: " \n " }))["steps.0.allowedHosts"] ===
+      "Add at least one host the agent may reach"
+  );
+  const badHosts = ["localhost", "127.0.0.1", "https://example.com", "exa mple.com", "example"];
+  check(
+    "an invalid host is named in the error",
+    badHosts.every((host) =>
+      (errorsOf(agentDraft({ tools: ["http_get"], allowedHosts: `example.com\n${host}` }))["steps.0.allowedHosts"] ?? "").includes(
+        `"${host}"`
+      )
+    )
+  );
+  const eleven = Array.from({ length: 11 }, (_, i) => `h${i}.example.com`).join("\n");
+  check(
+    "more than 10 hosts is an error",
+    errorsOf(agentDraft({ tools: ["http_get"], allowedHosts: eleven }))["steps.0.allowedHosts"] ===
+      "Use at most 10 hosts"
+  );
+
+  const labelled = agentOf(agentDraft({ labels: " hot \nwarm\n\nhot\ncold " }));
+  check(
+    "labels are split by line, trimmed and de-duplicated",
+    labelled.step?.labels !== undefined &&
+      JSON.stringify(labelled.step.labels) === JSON.stringify(["hot", "warm", "cold"])
+  );
+  check(
+    "a single label is an error: there is nothing to choose",
+    errorsOf(agentDraft({ labels: "only" }))["steps.0.labels"] === "Add at least two labels, or leave this empty"
+  );
+  check(
+    "more than 10 labels is an error",
+    errorsOf(agentDraft({ labels: Array.from({ length: 11 }, (_, i) => `l${i}`).join("\n") }))["steps.0.labels"] ===
+      "Use at most 10 labels"
+  );
+  check(
+    "a label over 40 characters is an error on the labels field",
+    errorsOf(agentDraft({ labels: `hot\n${"x".repeat(41)}` }))["steps.0.labels"] ===
+      "Each label can be at most 40 characters"
+  );
+
+  const saved = agentOf(
+    agentDraft({
+      tools: ["http_get", "query_runs"],
+      allowedHosts: "example.com\n*.api.example.com",
+      labels: "hot\ncold"
+    })
+  );
+  const back = saved.result.ok
+    ? workflowToDraft(
+        { name: saved.result.input.name, definition: saved.result.input.definition },
+        nextKey
+      )
+    : null;
+  const backStep = back?.steps[0];
+  check(
+    "an agent workflow can be edited: it round-trips through the draft",
+    backStep?.type === "AGENT" &&
+      backStep.task === "Assess the lead" &&
+      JSON.stringify(backStep.tools) === JSON.stringify(["http_get", "query_runs"]) &&
+      backStep.allowedHosts === "example.com\n*.api.example.com" &&
+      backStep.labels === "hot\ncold"
+  );
+  const bare = workflowToDraft(
+    {
+      name: "x",
+      definition: {
+        steps: [{ type: "AGENT", name: "A", task: "Do it", tools: [], allowedHosts: [] }]
+      }
+    },
+    nextKey
+  );
+  const bareStep = bare?.steps[0];
+  check(
+    "a stored agent without labels or hosts opens with empty fields",
+    bareStep?.type === "AGENT" && bareStep.labels === "" && bareStep.allowedHosts === ""
+  );
+}
+checkAgentSteps();
+
 check("an invalid stored definition is non-editable", workflowToDraft({ name: "x", definition: { steps: [] } }, () => "k") === null);
 
 check("moveStep: swaps forward", JSON.stringify(moveStep([1, 2, 3], 0, 1)) === "[2,1,3]");

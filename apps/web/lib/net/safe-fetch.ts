@@ -2,46 +2,13 @@ import { lookup as dnsLookup } from "node:dns";
 import { request as httpsRequest } from "node:https";
 import { isIP, type LookupFunction } from "node:net";
 import { isPublicIp } from "./ip";
+import { cleanHost, hostAllowed, normaliseAllowedHosts, SafeFetchError } from "./host";
 
-/** Its message is written to be safe to show to a user or to a model. */
-export class SafeFetchError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SafeFetchError";
-  }
-}
+// Re-exported so existing imports of these from this module keep working.
+export { hostAllowed, normaliseAllowedHosts, SafeFetchError } from "./host";
 
 const DEFAULT_MAX_BYTES = 8192;
 const DEFAULT_TIMEOUT_MS = 10_000;
-
-// A dotted host name with a letters-only (or punycode) top level, so IP
-// addresses and single-label names such as "localhost" can never match.
-const HOST_PATTERN =
-  /^(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/;
-
-function cleanHost(value: string): string {
-  return value.trim().toLowerCase().replace(/\.$/, "");
-}
-
-/** Lower-cases, de-duplicates and validates an allowlist; throws on a bad entry. */
-export function normaliseAllowedHosts(hosts: readonly string[]): string[] {
-  const result = new Set<string>();
-  for (const raw of hosts) {
-    const host = cleanHost(raw);
-    if (!HOST_PATTERN.test(host)) {
-      throw new SafeFetchError(`Invalid host in the allowlist: ${raw.slice(0, 60)}`);
-    }
-    result.add(host);
-  }
-  return [...result];
-}
-
-/** "example.com" matches only itself; "*.example.com" matches subdomains only. */
-export function hostAllowed(host: string, allowed: readonly string[]): boolean {
-  return allowed.some((entry) =>
-    entry.startsWith("*.") ? host.endsWith(entry.slice(1)) : host === entry
-  );
-}
 
 export function assertAllowedUrl(raw: string, allowedHosts: readonly string[]): URL {
   const allowed = normaliseAllowedHosts(allowedHosts);
