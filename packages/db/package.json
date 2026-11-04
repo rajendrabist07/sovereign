@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "generate": "prisma generate --no-hints",
-    "migrate": "prisma migrate dev && prisma generate --no-hints"
+    "migrate": "prisma migrate dev && prisma generate --no-hints",
+    "clean-verify": "node --env-file=../../.env scripts/clean-verify-tenants.mjs"
   },
   "devDependencies": {
     "@sovereign/config": "workspace:*",
