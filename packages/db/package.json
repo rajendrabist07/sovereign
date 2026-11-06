@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "generate": "prisma generate --no-hints",
     "migrate": "prisma migrate dev && prisma generate --no-hints",
-    "clean-verify": "node --env-file=../../.env scripts/clean-verify-tenants.mjs"
+    "clean-verify": "node --env-file=../../.env scripts/clean-verify-tenants.mjs",
+    "verify-permissions": "node --env-file=../../.env scripts/verify-db-permissions.mjs"
   },
   "devDependencies": {
     "@sovereign/config": "workspace:*",
