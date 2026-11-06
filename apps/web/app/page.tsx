@@ -3,7 +3,7 @@ import Link from "next/link";
 const LIVE = [
   {
     title: "Tenant isolation in the database",
-    body: "Every row belongs to a tenant and Postgres row-level security enforces it, so a forgotten WHERE clause cannot leak another tenant's data."
+    body: "Workflows, runs, approvals, quotas and the audit log sit behind Postgres row-level security, so a forgotten WHERE clause cannot leak another organisation's data."
   },
   {
     title: "Role-based access",
