@@ -1,5 +1,5 @@
 import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
-import { prisma, withTenant, type TenantTx } from "@sovereign/db";
+import { withTenant, withUser, type TenantTx } from "@sovereign/db";
 import type { Role } from "@sovereign/shared";
 import { createSyncCache, syncKey } from "./sync-cache";
 
@@ -45,12 +45,15 @@ export async function ensureUserAndTenant(): Promise<Resolution> {
   const email =
     clerkUser?.primaryEmailAddress?.emailAddress ?? `${userId}@unknown.invalid`;
 
-  // users has no RLS (one person can belong to many tenants).
-  const user = await prisma.user.upsert({
-    where: { clerkId: userId },
-    update: { email },
-    create: { clerkId: userId, email }
-  });
+  // One person can belong to many tenants, so a user row is not scoped by a
+  // tenant. It is scoped by who is asking: a person may only touch their own row.
+  const user = await withUser(userId, (tx) =>
+    tx.user.upsert({
+      where: { clerkId: userId },
+      update: { email },
+      create: { clerkId: userId, email }
+    })
+  );
 
   const role: Role = orgRole === "org:admin" ? "ADMIN" : "MEMBER";
 

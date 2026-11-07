@@ -91,5 +91,21 @@ export async function withTenant<T>(
   }, TRANSACTION_OPTIONS);
 }
 
+/**
+ * Runs `fn` inside a transaction that says WHO is asking, for tables that are
+ * scoped to a person instead of an organisation (the users table). The Clerk
+ * id must come from the verified session on the server, never from the client.
+ * Like withTenant, set_config(..., true) lasts only for this transaction.
+ */
+export async function withUser<T>(
+  clerkId: string,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.clerk_id', ${clerkId}, true)`;
+    return fn(tx);
+  }, TRANSACTION_OPTIONS);
+}
+
 /** The transaction client handed to code running inside withTenant(). */
 export type TenantTx = Prisma.TransactionClient;
