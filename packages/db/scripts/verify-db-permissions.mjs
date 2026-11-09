@@ -7,9 +7,8 @@ import pg from "pg";
 
 const ROLE = "app_user";
 // Tables with no row level security on purpose. Every other table must have it.
-//  - users: a person can belong to several organisations, so it has no tenant id.
 //  - _prisma_migrations: the runtime role has no access to it at all.
-const NO_RLS = ["_prisma_migrations", "users"];
+const NO_RLS = ["_prisma_migrations"];
 
 const ca = process.env.DB_SSL_CA?.replace(/\\n/g, "\n");
 const adminUrl = process.env.DIRECT_URL;

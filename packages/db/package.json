@@ -13,7 +13,7 @@
     "generate": "prisma generate --no-hints",
     "migrate": "prisma migrate dev && prisma generate --no-hints",
     "clean-verify": "node --env-file=../../.env scripts/clean-verify-tenants.mjs",
-    "verify-permissions": "node --env-file=../../.env scripts/verify-db-permissions.mjs"
+    "verify-permissions": "node --env-file=../../.env scripts/verify-db-permissions.mjs && node --env-file=../../.env scripts/verify-user-rls.mjs"
   },
   "devDependencies": {
     "@sovereign/config": "workspace:*",
