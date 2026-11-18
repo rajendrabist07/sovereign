@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { withTenant } from "@sovereign/db";
 import { roleAtLeast, type Role } from "@sovereign/shared";
+import { maskInternalError } from "./mask";
 
 export type Session = { userId: string; tenantId: string; role: Role };
 
@@ -13,7 +14,19 @@ export type Context = {
 
 type AfterCommit = (fn: () => Promise<void>) => void;
 
-const t = initTRPC.context<Context>().create({ transformer: superjson });
+const t = initTRPC.context<Context>().create({
+  transformer: superjson,
+  errorFormatter({ shape, error, path }) {
+    const masked = maskInternalError({
+      shape,
+      production: process.env.NODE_ENV === "production"
+    });
+    // What the person sees is generic; the real error stays here, in the server
+    // log, under the same reference they can quote.
+    if (masked.ref) console.error(`tRPC internal error ${masked.ref} on ${path ?? "<no-path>"}:`, error);
+    return masked.shape;
+  }
+});
 
 export const router = t.router;
 export const createCallerFactory = t.createCallerFactory;

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { roleAtLeast } from "@sovereign/shared";
 import { ListEmpty, ListError, ListSkeleton } from "@/components/list-states";
+import { friendlyMessage } from "@/lib/errors";
 import { WorkflowForm } from "@/components/workflow-form";
 import { workflowToDraft } from "@/lib/workflow-draft";
 import { useTRPC } from "@/trpc/client";
@@ -25,7 +26,7 @@ export function WorkflowEditor({ workflowId }: { workflowId?: string }) {
     return (
       <ListError
         title="Couldn't check your permissions."
-        message={me.error.message}
+        message={friendlyMessage(me.error)}
         onRetry={() => me.refetch()}
       />
     );
@@ -55,7 +56,7 @@ export function WorkflowEditor({ workflowId }: { workflowId?: string }) {
     return (
       <ListError
         title="Couldn't load this workflow."
-        message={workflow.error.message}
+        message={friendlyMessage(workflow.error)}
         onRetry={() => workflow.refetch()}
       />
     );

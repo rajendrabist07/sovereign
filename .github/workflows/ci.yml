@@ -50,6 +50,7 @@ jobs:
           pnpm run verify-agent-logic
           pnpm run verify-safe-fetch
           pnpm run verify-groq-adapter
+          pnpm run verify-error-text
 
       - name: Build
         env:

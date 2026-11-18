@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { ListEmpty, ListError, ListSkeleton } from "@/components/list-states";
+import { friendlyMessage } from "@/lib/errors";
 import { RunRows } from "@/components/run-rows";
 import { pollDelay, youngestActiveAge } from "@/lib/polling";
 import { useTRPC } from "@/trpc/client";
@@ -20,7 +21,7 @@ export function RecentRuns() {
     return (
       <ListError
         title="Couldn't load runs."
-        message={runs.error.message}
+        message={friendlyMessage(runs.error)}
         onRetry={() => runs.refetch()}
       />
     );

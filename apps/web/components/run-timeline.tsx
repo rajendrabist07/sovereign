@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { stepSchema, z, type WorkflowStep } from "@sovereign/shared";
 import { ListError, ListSkeleton } from "@/components/list-states";
+import { friendlyMessage } from "@/lib/errors";
 import { RunAction } from "@/components/run-action";
 import { StatusDot, type StatusDotValue } from "@/components/status-dot";
 import { stepDisplayStatus } from "@/lib/step-status";
@@ -199,7 +200,7 @@ export function RunTimeline({ runId }: { runId: string }) {
     return (
       <ListError
         title="Couldn't load this run."
-        message={query.error.message}
+        message={friendlyMessage(query.error)}
         onRetry={() => query.refetch()}
       />
     );

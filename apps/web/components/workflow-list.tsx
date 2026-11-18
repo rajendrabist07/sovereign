@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { roleAtLeast, workflowDefinitionSchema } from "@sovereign/shared";
 import { ListEmpty, ListError, ListSkeleton } from "@/components/list-states";
+import { friendlyMessage } from "@/lib/errors";
 import { RunAction } from "@/components/run-action";
 import { formatRelative } from "@/lib/format";
 import { STEP_LABEL } from "@/lib/step-labels";
@@ -31,7 +32,7 @@ export function WorkflowList() {
     return (
       <ListError
         title="Couldn't load workflows."
-        message={workflows.error.message}
+        message={friendlyMessage(workflows.error)}
         onRetry={() => workflows.refetch()}
       />
     );
