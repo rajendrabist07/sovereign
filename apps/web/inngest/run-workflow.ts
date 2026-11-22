@@ -6,6 +6,7 @@ import {
   APPROVAL_TIMEOUT,
   approvalOutcome
 } from "../lib/runs/approval";
+import { newRef, publicStepError } from "../lib/errors";
 import { recordStep } from "../lib/runs/state";
 import { inngest } from "./client";
 import { executeAgentStep } from "./agent-step";
@@ -148,9 +149,11 @@ export const runWorkflow = inngest.createFunction(
         }
       }
     } catch (error) {
-      const message = (
-        error instanceof Error ? error.message : String(error)
-      ).slice(0, 500);
+      // Only messages we wrote ourselves are stored (and so shown); the real
+      // error stays in the server log under the same reference.
+      const ref = newRef();
+      const message = publicStepError(error, ref);
+      console.error("[step-failed]", ref, error);
       await step.run("mark-failed", () =>
         withTenant(tenantId, (tx) =>
           recordStep(tx, runId, currentIndex, { status: "FAILED", error: message })

@@ -1,6 +1,7 @@
 import { NonRetriableError } from "inngest";
 import { withTenant } from "@sovereign/db";
 import type { WorkflowStep } from "@sovereign/shared";
+import { PublicError } from "../lib/errors";
 import { recordStep } from "../lib/runs/state";
 
 type HttpStep = Extract<WorkflowStep, { type: "HTTP_REQUEST" }>;
@@ -84,7 +85,7 @@ export async function executeHttpStep(args: {
   const bodyPreview = await readCapped(response, MAX_BODY_BYTES);
 
   if (response.status === 429 || response.status >= 500) {
-    throw new Error(`HTTP ${response.status} (will retry)`);
+    throw new PublicError(`HTTP ${response.status} (will retry)`);
   }
   if (!response.ok) {
     throw new NonRetriableError(`HTTP ${response.status}`);

@@ -47,3 +47,54 @@ export function friendlyMessage(error: unknown): string {
   if (!AUTHORED_CODES.has(code)) return GENERIC_ERROR;
   return message === code ? (WHEN_NO_MESSAGE[code] ?? GENERIC_ERROR) : message;
 }
+
+/** A failure whose message we wrote for the person: safe to store and to show. */
+export class PublicError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PublicError";
+  }
+}
+
+/** Short reference that links a screen to a server log line. Works in browser and Node. */
+export function newRef(): string {
+  return globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+}
+
+export function unexpectedStepMessage(ref: string): string {
+  return `This step failed unexpectedly (ref ${ref}).`;
+}
+
+// Matched by name, not instanceof: Inngest rebuilds an error that crossed
+// step.run() as a plain Error, so the class is gone but the name survives.
+const STEP_AUTHORED_NAMES = new Set([
+  "AgentError",
+  "SafeFetchError",
+  "LlmProviderError",
+  "ToolError",
+  "NonRetriableError",
+  "RetryAfterError",
+  "PublicError"
+]);
+
+/**
+ * The text stored on a failed step, and so shown in the run timeline. Only
+ * errors we wrote ourselves keep their message; anything else becomes a
+ * generic text with a reference (the caller logs the real error with it).
+ */
+export function publicStepError(error: unknown, ref: string): string {
+  const candidate = error as { name?: unknown; message?: unknown } | null;
+  const authored =
+    typeof candidate?.name === "string" &&
+    STEP_AUTHORED_NAMES.has(candidate.name) &&
+    typeof candidate.message === "string" &&
+    candidate.message.length > 0;
+  return authored ? (candidate!.message as string).slice(0, 500) : unexpectedStepMessage(ref);
+}
+
+/** The Run button: its own wording for FORBIDDEN, everything else as friendlyMessage. */
+export function startRunMessage(error: unknown): string {
+  const code = (error as { data?: { code?: unknown } | null } | null)?.data?.code;
+  if (code === "FORBIDDEN") return "You need the member role to run workflows.";
+  return friendlyMessage(error);
+}

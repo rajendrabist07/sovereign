@@ -1,4 +1,13 @@
-import { friendlyMessage, GENERIC_ERROR, internalErrorMessage } from "../lib/errors";
+import {
+  friendlyMessage,
+  GENERIC_ERROR,
+  internalErrorMessage,
+  newRef,
+  PublicError,
+  publicStepError,
+  startRunMessage,
+  unexpectedStepMessage
+} from "../lib/errors";
 import { maskInternalError } from "../trpc/mask";
 
 // No database, no network: what a person is shown when a request fails.
@@ -73,6 +82,41 @@ check(
   "null, undefined, a string and a number are generic",
   [null, undefined, "boom", 42].every((value) => friendlyMessage(value) === GENERIC_ERROR)
 );
+
+// What is stored on a failed step, and so shown in the run timeline
+const namedError = (name: string, message: string) => Object.assign(new Error(message), { name });
+const STEP_REF = "0a1b2c3d";
+const STEP_AUTHORED_NAMES = [
+  "AgentError",
+  "SafeFetchError",
+  "LlmProviderError",
+  "ToolError",
+  "NonRetriableError",
+  "RetryAfterError",
+  "PublicError"
+];
+const prismaLike = namedError("PrismaClientKnownRequestError", RAW);
+check(
+  "an error with a name we wrote keeps its message",
+  STEP_AUTHORED_NAMES.every((n) => publicStepError(namedError(n, "Only https:// URLs are allowed"), STEP_REF) === "Only https:// URLs are allowed")
+);
+check("an unexpected error becomes the generic text with the reference", publicStepError(prismaLike, STEP_REF) === unexpectedStepMessage(STEP_REF));
+check("the real message never reaches the stored text", !publicStepError(prismaLike, STEP_REF).includes("supabase"));
+check("a plain Error is generic, even a harmless-looking one", publicStepError(new Error("HTTP 500 (will retry)"), STEP_REF) === unexpectedStepMessage(STEP_REF));
+check("a PublicError keeps its message", publicStepError(new PublicError("HTTP 500 (will retry)"), STEP_REF) === "HTTP 500 (will retry)");
+check(
+  "a validation error, a string, null and undefined are generic",
+  [namedError("ZodError", '[{"code":"too_small"}]'), "boom", null, undefined].every((v) => publicStepError(v, STEP_REF) === unexpectedStepMessage(STEP_REF))
+);
+check("a long authored message is cut to 500 characters", publicStepError(new PublicError("x".repeat(900)), STEP_REF).length === 500);
+check("a reference is 8 hex characters and differs each time", /^[0-9a-f]{8}$/.test(newRef()) && newRef() !== newRef());
+
+// The Run button: its own wording for FORBIDDEN, everything else as friendlyMessage
+check("Run button: FORBIDDEN says the member role is needed", startRunMessage(clientError("FORBIDDEN", "Requires MEMBER role or higher")) === "You need the member role to run workflows.");
+check("Run button: the masked internal message keeps its reference", startRunMessage(clientError("INTERNAL_SERVER_ERROR", internalErrorMessage("0a1b2c3d"))) === internalErrorMessage("0a1b2c3d"));
+check("Run button: a quota message is shown", startRunMessage(clientError("TOO_MANY_REQUESTS", "Monthly run limit reached (100).")) === "Monthly run limit reached (100).");
+check("Run button: a raw database error is generic", startRunMessage(clientError("INTERNAL_SERVER_ERROR", RAW)) === GENERIC_ERROR);
+check("Run button: a network failure is generic", startRunMessage(clientError(null, "Failed to fetch")) === GENERIC_ERROR);
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { internalErrorMessage } from "../lib/errors";
+import { internalErrorMessage, newRef } from "../lib/errors";
 
 type Maskable = { message: string; data: { code: string; stack?: string | undefined } };
 
@@ -17,7 +16,7 @@ export function maskInternalError<S extends Maskable>(args: {
 }): { shape: S; ref: string | null } {
   const { shape, production } = args;
   if (!production || shape.data.code !== "INTERNAL_SERVER_ERROR") return { shape, ref: null };
-  const ref = args.ref ?? randomUUID().replace(/-/g, "").slice(0, 8);
+  const ref = args.ref ?? newRef();
   const masked = {
     ...shape,
     message: internalErrorMessage(ref),
