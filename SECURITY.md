@@ -41,7 +41,7 @@ Each claim below says which test covers it. "Not proved" lists what is not cover
 
 ### Prompt injection
 
-- Claim: data fetched by tools is wrapped as untrusted input for the model, tools take strictly validated arguments, and the agent has hard limits (5 iterations, 8000 tokens, 4 tool calls per turn).
+- Claim: data fetched by tools is wrapped as untrusted input for the model, tools take strictly validated arguments, and the agent has hard limits. The defaults in code are 5 iterations, 8000 tokens and 4 tool calls per turn; a test asserts the 5, and the other two limits are enforced and tested with smaller values, but their default numbers are not asserted by a test.
 - Proved by: `verify-agent-logic` against a scripted fake model.
 - Not proved: nothing was tested against a real model. The agent has never called the real Groq API, so resistance to real prompt injection is unknown.
 
