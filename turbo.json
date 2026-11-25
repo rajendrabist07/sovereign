@@ -16,7 +16,9 @@
         "DB_TX_TIMEOUT_MS",
         "CLERK_SECRET_KEY",
         "INNGEST_EVENT_KEY",
-        "INNGEST_SIGNING_KEY"
+        "INNGEST_SIGNING_KEY",
+        "GROQ_API_KEY",
+        "GROQ_MODEL"
       ]
     },
     "dev": {
