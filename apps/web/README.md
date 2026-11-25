@@ -1,7 +1,7 @@
 # Sovereign — apps/web
 
-Next.js 15 frontend + API layer for Sovereign (multi-tenant AI workflow platform).
-See the [root README](../../README.md) for the full project overview and build sequence.
+Next.js 16 frontend + API layer for Sovereign (multi-tenant AI workflow platform).
+See the [root README](../../README.md) for the project overview, setup (including the database role) and tests.
 
 ## Local development
 
