@@ -8,7 +8,7 @@ import {
 } from "./llm";
 
 export const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
-export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
 const DEFAULT_TIMEOUT_MS = 30_000;

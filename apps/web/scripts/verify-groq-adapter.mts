@@ -385,5 +385,8 @@ try {
   await stub.close();
 }
 
+// Checked against the live /models list on 2026-11 with a real key: llama-3.3-70b-versatile was not offered.
+check("the default model is one the live Groq account offers", DEFAULT_GROQ_MODEL === "openai/gpt-oss-120b");
+
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);
